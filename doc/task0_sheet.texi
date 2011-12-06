@@ -1,0 +1,11 @@
+\input texinfo                          @c -*- texinfo -*-
+
+@c %**start of header
+@setfilename task0_sheet.info
+@settitle Pintos Task 0
+@c %**end of header
+
+@chapter Pintos-IC Task 0 questions
+@include task0_questions.texi
+
+@bye

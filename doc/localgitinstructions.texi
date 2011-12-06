@@ -1,0 +1,118 @@
+@c
+@c Instructions on how to set up a group environment, permissions, 
+@c Git repository, dealing with issues etc.
+@c
+@c While some of the discussion may apply to more than one environment,
+@c no attempt was made to untangle and split the discussion.
+@c
+
+@menu
+* Setting Up Git::              
+* Using a bare repository::
+* Using Git::                   
+@end menu
+
+@node Setting Up Git
+@subsection Setting Up Git
+
+It is recommended when using git for this task to decide on one
+group member to be in charge of the canonical repository. It is
+recommended that those unfamiliar with git should work together in
+the same repository rather than creating copies for each member.
+
+To make the Git log easier to read later, set the user.name and
+user.email variables in your .gitconfig file:
+@verbatim
+[user]
+    name  = Firstname Surname
+    email = example@doc.ic.ac.uk
+@end verbatim
+
+To work on the source code, you must create a clone of the initial
+repository. This can be done by running
+@samp{git clone @value{localpintosgitpath} pintos} to copy
+the initial repository into a directory named @samp{pintos}.
+
+@node Using a bare repository
+@subsection Using a bare repository
+
+If you wish to work with repositories for each group member, you can use
+a @strong{bare repository} to make synchronising your development easier.
+
+To create a bare repository, go to your shared directory and run the
+following:
+
+@verbatim
+  chmod g+s .
+  git clone --bare /vol/lab/secondyear/osexercise/pintos.git pintos-ic
+  cd pintos-ic
+  git init --bare --shared=group
+@end verbatim
+
+This will make sure group permissions are inherited by the repository when
+it is cloned, and will also ensure that the repository behaves correctly with
+multiple contributors.
+
+Once this is done, you can add your group repository as a remote from your
+personal repository with
+@samp{git remote add group /vol/project/2010/261/g10261@var{$GROUP}/pintos-ic}.
+You can then share commits using @samp{git fetch}, @samp{git pull}, and
+@samp{git push}. For instance, you can share commits from your personal repo
+with @samp{git push group master}, and get commits from the group repo with
+@samp{get fetch group}. These commits can be merged as usual. If you want to
+merge the master branch directly, you can use @samp{git pull group master}.
+
+As bare repos are not `special' in any way, they can be deleted and recreated
+if required. Just be sure that you have any commits you want to keep in your
+personal repo before deleting.
+
+@node Using Git
+@subsection Using Git
+
+Once you've cloned the repository, you can start working in your clone
+straight away. At any point you can see what files you've modified with
+@samp{git status}, and check a file in greater detail with
+@samp{git diff @var{filename}}. You view more detailed information using
+tools such as @samp{tig}
+
+Git uses an intermediary area between the working filesystem and the actual 
+repository, known as the staging area (or index). This allows you to perform
+tasks such as commiting only a subset of your changes, without modifying your
+copy of the filesystem. Whilst the uses of the staging area are outside the
+scope of this guide, it is important that you are aware of its existence.
+
+When you want to place your modifications into the repository, you must
+first update the staging area with your changes (@samp{git add @var{filename}},
+and then use this to update the repository, using @samp{git commit}. Git
+will open a text editor when commiting, allowing you to provide a description
+of your changes. This can be useful later for reviewing the repository,
+so be sensible with your commit messages.
+
+If your group is using a repository per person, rather than working
+together using one, you may make conflicting changes at some point,
+which git is unable to solve. these problems can be solved using
+@samp{git mergetool}, but its use is outside the scope of this dicussion.
+
+You can view the history of @var{file} in your working directory,
+including the log messages, with @samp{git log @var{file}}.
+
+You can give a particular set of file versions a name called a
+@dfn{tag}. Simply execute @samp{git tag @var{name}}.  It's best
+to have no local changes in the working copy when you do this, because
+the tag will not include uncommitted changes. To recover the tagged
+commit later, simply execute @samp{git checkout @var{tag}}.
+
+If you add a new file to the source tree, you'll need to add it to the
+repository with @samp{git add @var{file}}.  This command does not have
+lasting effect until the file is committed later with @samp{git
+commit}.
+
+To remove a file from the source tree, first remove it from the file
+system with @samp{git rm @var{file}}. Again, only @samp{git commit}
+will make the change permanent.
+
+To discard your local changes for a given file, without committing
+them, use @samp{git checkout @var{file} -f}.
+
+For more information, visit the @uref{https://www.git-scm.com/, , Git
+home page}.
