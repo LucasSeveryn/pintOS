@@ -1,0 +1,53 @@
+@node Task 0--Codebase
+@chapter Task 0: Codebase Preview
+
+This codebase preview has been designed to help you understand how
+Pintos is structured before you actually begin to add features to it. The
+exercise requires you to answer a worksheet (handed out 
+through CATE) that contains a few questions to check your understanding.
+
+Tasks 0 and 1 will count as the coursework for the operating systems
+course. Task 0 will carry 25% of the coursework marks, with the rest
+allocated to Task 1.
+
+@b{Task 0 will be assessed individually, unlike the rest of the tasks in this
+   project.}
+
+@menu
+* Sections Tested::
+* Files::
+@end menu
+
+@node Sections Tested
+@section Sections Tested
+
+You will be expected to have fully read:
+
+@itemize
+
+@item Section 1
+@item Section 3.1
+@item Sections A.2-4
+@item Sections C, D, E and F
+
+@end itemize
+
+@node Files
+@section Files
+The source files you will have to understand:
+@table @file
+
+@item src/threads/thread.c
+      Contains bulk of threading system code
+@item src/threads/thread.h
+      Header file for threads, contains thread struct
+@item src/threads/synch.c
+      Contains the implementation of major synchronisation primitives like
+      locks and semaphores
+@item src/lib/kernel/list.c
+      Contains Pintos' list implementation
+@end table
+
+@page
+@section Task 0 questions
+@include task0_questions.texi

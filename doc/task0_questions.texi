@@ -1,0 +1,37 @@
+@enumerate  
+  @item Which Git command can be used to retrieve a copy of Pintos to your
+  group directory?
+  @item Why is using the @code{strcpy()} function to copy strings usually a
+  bad idea?
+  @item Explain how thread scheduling in Pintos currently works in less than
+  250 words. Include the chain of execution of function calls.
+  @item Explain the property of reproducibility and how the lack of
+  reproducibility will affect debugging.
+  @item How would you print an unsigned 64 bit @code{int}? (Consider that you
+  are working with C99)
+  @item What makes locks and semaphores in Pintos similar? What extra property
+  do locks have?
+  @item What are the limitations on the size of the thread struct? How does
+  Pintos identify stack overflow?
+  @item If test @file{src/tests/threads/alarm-multiple} fails, where would
+  you find its output and result logs? You might want to run this test and
+  find out.
+    @item Given a struct defined as follows:
+@verbatim
+struct foo 
+{ 
+  int bar;
+  struct list_elem e;
+};
+@end verbatim
+   And a list declaration:
+@verbatim
+struct list foo_list;
+@end verbatim
+    Give a piece of code that would insert an element of @code{struct foo}
+    into the list ordered (in ascending order) by the element @code{bar}.
+    Assume @file{<list.h>} has been included.
+  @item For a list of @code{struct foo} as above, write a piece of code to
+  iterate through the list and return a pointer to the struct if element
+  @code{bar} is equal to @code{int x}.
+@end enumerate

@@ -1,0 +1,60 @@
+@c Local settings
+
+@set coursenumber OS211 
+@set localpintosgitpath /vol/lab/secondyear/osexercise/pintos.git
+@set localpintosbindir /vol/lab/secondyear/bin/ 
+
+@set recommendvnc
+@clear recommendcygwin
+
+@macro localmachines{}
+The machines officially supported for OS211 Pintos development are
+the Linux machines in the labs managed by CSG, as described on
+the @uref{http://www.doc.ic.ac.uk/csg/facilities/lab/workstations, ,
+CSG webpage}.  
+@end macro
+
+@macro localpathsetup{}
+Pintos utilities can be located at @value{localpintosbindir} on CSG-run
+lab machines.
+@end macro
+
+@macro localcrossbuild{}
+Watch the commands executed during the build.  On the Linux machines,
+the ordinary system tools are used.  
+@end macro
+
+@macro localhonorcodepolicy{}
+Please respect the plagiarism policy by refraining 
+from reading any homework solutions available online or elsewhere. Reading 
+the source code for other operating system kernels, such as Linux or FreeBSD, 
+is allowed, but do not copy code from them literally.  Please cite the code 
+that inspired your own in your design documentation.
+@end macro
+
+@macro localcredits{}
+@c none needed
+@end macro
+
+@macro localgitpolicy{}
+Instead, we recommend integrating your team's changes early and often,
+using a source code control system such as Git (@pxref{Git}), for which
+the Pintos-ic folder has already been set up for.
+
+This is less likely to produce surprises, because everyone can see
+everyone else's code as it is written, instead of just when it is
+finished.  These systems also make it possible to review changes and,
+when a change introduces a bug, drop back to working versions of code.
+@end macro
+
+@macro localcodingstandards{}
+All of you should be familiar with good coding standards by now. This project
+will be much easier to complete and grade if you maintain the code style used
+in the original code, and employ sensible variable naming policies. Code style
+makes up a large part of your final grade for this work, and will be 
+scrutinised carefully
+@end macro
+
+@macro localdevelopmenttools{}
+@c Descriptions of additional, local development tools can be inserted here
+@end macro
