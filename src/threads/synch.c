@@ -242,9 +242,7 @@ lock_release (struct lock *lock)
 {
   ASSERT (lock != NULL);
   ASSERT (lock_held_by_current_thread (lock));
-  
-  list_remove (lock->lock_elem);
-  recompute_priority(); 
+
   lock->holder = NULL;
   sema_up (&lock->semaphore);
 }
@@ -258,50 +256,6 @@ lock_held_by_current_thread (const struct lock *lock)
   ASSERT (lock != NULL);
 
   return lock->holder == thread_current ();
-}
-
-
-/* Recursively donates priority for given lock so that all 
-   priorities are boosted to the highest available. */
-void 
-donate_priority (const struct lock *lock) 
-{
-  ASSERT (lock != NULL);
-  struct thread *lock_owner = lock->holder;
-  struct thread *current_thread = thread_current ();
-  
-  if( lock_owner->priority < current_thread->priority )
-  	lock_owner->priority = current_thread->priority;
-
-  if( lock_owner->status == THREAD_BLOCKED && lock_owner->blocked_on != NULL ) {
-  	donate_priority (lock_owner->blocked_on);
-  }
-}	
-
-/* Recomputes new priority of a thread after it has released a lock. */
-void
-recompute_priority () 
-{
-  struct thread *t = thread_current ();
-  struct list *held_locks = &t->held_locks; 
-  struct list_elem e;
-
-  for (e = list_begin (held_locks); e != list_end (held_locks); 
-		  e = list_next (e))
-  {
-  	struct lock *lock = list_entry (e, struct lock, lock_elem);
-	struct list *waiters = &lock->semaphore->waiters;
-	struct list_elem thread;
-	for (thread = list_begin (waiters); thread != list_end (waiters); 
-			thread = list_next (thread))
-	{
-	  struct thread *waiting_thread = list_entry (thread, struct thread, elem);
-	  if (waiting_thread->priority > t->priority)
-		  t->priority = waiting_thread->priority;
-	}
-  }
-  if (t->priority < t->base_priority) 
-	  t->priority = t->base_priority;
 }
 
 /* One semaphore in a list. */
