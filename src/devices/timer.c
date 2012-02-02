@@ -7,7 +7,8 @@
 #include "threads/interrupt.h"
 #include "threads/synch.h"
 #include "threads/thread.h"
-  
+
+/* lololo
 /* See [8254] for hardware details of the 8254 timer chip. */
 
 #if TIMER_FREQ < 19
@@ -81,19 +82,23 @@ timer_ticks (void)
 int64_t
 timer_elapsed (int64_t then) 
 {
-  return timer_ticks () - then;
+  return timer_ticks () - then; //timer_ticks = "now" ticks
 }
 
 /* Sleeps for approximately TICKS timer ticks.  Interrupts must
    be turned on. */
 void
-timer_sleep (int64_t ticks) 
+timer_sleep (int64_t ticks) //set sleep for ticks time.
 {
-  int64_t start = timer_ticks ();
+  int64_t start = timer_ticks (); //ticks at start of sleep
+  
+  set_wakeup_time(ticks);
+  thread_sleep();
 
-  ASSERT (intr_get_level () == INTR_ON);
-  while (timer_elapsed (start) < ticks) 
-    thread_yield ();
+
+  //ASSERT (intr_get_level () == INTR_ON);
+  //while (timer_elapsed (start) < ticks) 
+  //  thread_yield (); //as long as (current ticks - starting ticks) are lower than target ticks, yield.
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be

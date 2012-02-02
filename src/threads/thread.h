@@ -8,6 +8,7 @@
 /* States in a thread's life cycle. */
 enum thread_status
   {
+    THREAD_SLEEPING    /* Sleeping thread. */
     THREAD_RUNNING,     /* Running thread. */
     THREAD_READY,       /* Not running but ready to run. */
     THREAD_BLOCKED,     /* Waiting for an event to trigger. */
@@ -89,6 +90,7 @@ struct thread
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
     struct list_elem allelem;           /* List element for all threads list. */
+    int64_t time_to_wake;               /* Absolute time after which thread will wake up. */
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */

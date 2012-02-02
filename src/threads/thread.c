@@ -322,6 +322,25 @@ thread_yield (void)
   intr_set_level (old_level);
 }
 
+/* Yields the CPU and sets the current thread status to 
+   THREAD_SLEEPING. */
+void
+thread_sleep (void) 
+{
+    struct thread *cur = thread_current ();
+    enum intr_level old_level;
+    
+    ASSERT (!intr_context ());
+    
+    old_level = intr_disable ();
+    if (cur != idle_thread) 
+        list_push_back (&ready_list, &cur->elem);
+    cur->status = THREAD_SLEEP;
+    schedule ();
+    intr_set_level (old_level);
+}
+
+
 /* Invoke function 'func' on all threads, passing along 'aux'.
    This function must be called with interrupts off. */
 void
@@ -557,6 +576,11 @@ thread_schedule_tail (struct thread *prev)
 
    It's not safe to call printf() until thread_schedule_tail()
    has completed. */
+
+
+/* KURWA KURWA KURWA! Napisane bys zauwazyl. Za kazdym razem jak
+ bierzesz next thread to run to trzeba sprawdzac stan czy nie jest 
+ THREAD_SLEEPING i sprawdzac czy czasem nie pora go obudzic.*/
 static void
 schedule (void) 
 {
@@ -590,3 +614,12 @@ allocate_tid (void)
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
+
+
+/* Sets current thread wakeup time to absolute time after 
+   TICKS ticks */
+void
+set_wakeup_time (int64_t ticks_until_wakeup)
+{
+  current_thread()->time_to_wake=ticksticks_until_wakeup + timer_ticks();
+}
