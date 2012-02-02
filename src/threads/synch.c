@@ -192,12 +192,24 @@ lock_init (struct lock *lock)
 void
 lock_acquire (struct lock *lock)
 {
+  bool acquired_lock;
+  struct thread * t;
+
   ASSERT (lock != NULL);
   ASSERT (!intr_context ());
   ASSERT (!lock_held_by_current_thread (lock));
 
-  sema_down (&lock->semaphore);
-  lock->holder = thread_current ();
+  t = thread_current ();
+  
+  acquired_lock = sema_try_down (&lock->semaphore);
+  if(!acquired_lock) {
+	t->blocked_on = lock;
+  	donate_priority(lock);
+	sema_down(&lock->semaphore);
+  }
+  
+  list_push_front(&t->held_locks, &lock->lock_elem); //change to insert in order
+  lock->holder = t;
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
@@ -230,7 +242,9 @@ lock_release (struct lock *lock)
 {
   ASSERT (lock != NULL);
   ASSERT (lock_held_by_current_thread (lock));
-
+  
+  list_remove (lock->lock_elem);
+  recompute_priority(); 
   lock->holder = NULL;
   sema_up (&lock->semaphore);
 }
@@ -244,6 +258,50 @@ lock_held_by_current_thread (const struct lock *lock)
   ASSERT (lock != NULL);
 
   return lock->holder == thread_current ();
+}
+
+
+/* Recursively donates priority for given lock so that all 
+   priorities are boosted to the highest available. */
+void 
+donate_priority (const struct lock *lock) 
+{
+  ASSERT (lock != NULL);
+  struct thread *lock_owner = lock->holder;
+  struct thread *current_thread = thread_current ();
+  
+  if( lock_owner->priority < current_thread->priority )
+  	lock_owner->priority = current_thread->priority;
+
+  if( lock_owner->status == THREAD_BLOCKED && lock_owner->blocked_on != NULL ) {
+  	donate_priority (lock_owner->blocked_on);
+  }
+}	
+
+/* Recomputes new priority of a thread after it has released a lock. */
+void
+recompute_priority () 
+{
+  struct thread *t = thread_current ();
+  struct list *held_locks = &t->held_locks; 
+  struct list_elem e;
+
+  for (e = list_begin (held_locks); e != list_end (held_locks); 
+		  e = list_next (e))
+  {
+  	struct lock *lock = list_entry (e, struct lock, lock_elem);
+	struct list *waiters = &lock->semaphore->waiters;
+	struct list_elem thread;
+	for (thread = list_begin (waiters); thread != list_end (waiters); 
+			thread = list_next (thread))
+	{
+	  struct thread *waiting_thread = list_entry (thread, struct thread, elem);
+	  if (waiting_thread->priority > t->priority)
+		  t->priority = waiting_thread->priority;
+	}
+  }
+  if (t->priority < t->base_priority) 
+	  t->priority = t->base_priority;
 }
 
 /* One semaphore in a list. */
