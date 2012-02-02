@@ -263,7 +263,7 @@ lock_held_by_current_thread (const struct lock *lock)
 
 /* Recursively donates priority for given lock so that all 
    priorities are boosted to the highest available. */
-void 
+void
 donate_priority (const struct lock *lock) 
 {
   ASSERT (lock != NULL);
@@ -276,7 +276,7 @@ donate_priority (const struct lock *lock)
   if( lock_owner->status == THREAD_BLOCKED && lock_owner->blocked_on != NULL ) {
   	donate_priority (lock_owner->blocked_on);
   }
-}	
+}
 
 /* Recomputes new priority of a thread after it has released a lock. */
 void
