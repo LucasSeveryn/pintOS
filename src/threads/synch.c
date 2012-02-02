@@ -242,7 +242,9 @@ lock_release (struct lock *lock)
 {
   ASSERT (lock != NULL);
   ASSERT (lock_held_by_current_thread (lock));
-
+  
+  list_remove (lock->lock_elem);
+  recompute_priority(); 
   lock->holder = NULL;
   sema_up (&lock->semaphore);
 }
