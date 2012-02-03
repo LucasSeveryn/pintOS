@@ -33,7 +33,7 @@ bool lock_held_by_current_thread (const struct lock *);
 
 /* Functions for recomputing priorities */
 void donate_priority (const struct lock *);
-void recompute_priority ();
+void recompute_priority (void);
 
 /* Condition variable. */
 struct condition 

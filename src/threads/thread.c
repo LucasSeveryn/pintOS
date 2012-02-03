@@ -335,7 +335,7 @@ thread_sleep (void)
     old_level = intr_disable ();
     if (cur != idle_thread) 
         list_push_back (&ready_list, &cur->elem);
-    cur->status = THREAD_SLEEP;
+    cur->status = THREAD_SLEEPING;
     schedule ();
     intr_set_level (old_level);
 }
@@ -621,12 +621,3 @@ allocate_tid (void)
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
-
-
-/* Sets current thread wakeup time to absolute time after 
-   TICKS ticks */
-void
-set_wakeup_time (int64_t ticks_until_wakeup)
-{
-  current_thread()->time_to_wake=ticksticks_until_wakeup + timer_ticks();
-}

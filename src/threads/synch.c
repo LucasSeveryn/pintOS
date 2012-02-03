@@ -284,14 +284,14 @@ recompute_priority ()
 {
   struct thread *t = thread_current ();
   struct list *held_locks = &t->held_locks; 
-  struct list_elem e;
+  struct list_elem *e;
 
   for (e = list_begin (held_locks); e != list_end (held_locks); 
 		  e = list_next (e))
   {
   	struct lock *lock = list_entry (e, struct lock, lock_elem);
-	struct list *waiters = &lock->semaphore->waiters;
-	struct list_elem thread;
+	struct list *waiters = &lock->semaphore.waiters;
+	struct list_elem *thread;
 	for (thread = list_begin (waiters); thread != list_end (waiters); 
 			thread = list_next (thread))
 	{

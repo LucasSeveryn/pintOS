@@ -77,6 +77,14 @@ timer_ticks (void)
   return t;
 }
 
+/* Sets current thread wakeup time to absolute time after 
+   TICKS ticks */
+void
+set_wakeup_time (int64_t ticks_until_wakeup)
+{
+  thread_current ()->time_to_wake = ticks_until_wakeup + ticks;
+}
+
 /* Returns the number of timer ticks elapsed since THEN, which
    should be a value once returned by timer_ticks(). */
 int64_t
@@ -90,15 +98,8 @@ timer_elapsed (int64_t then)
 void
 timer_sleep (int64_t ticks) //set sleep for ticks time.
 {
-  int64_t start = timer_ticks (); //ticks at start of sleep
-  
   set_wakeup_time(ticks);
   thread_sleep();
-
-
-  //ASSERT (intr_get_level () == INTR_ON);
-  //while (timer_elapsed (start) < ticks) 
-  //  thread_yield (); //as long as (current ticks - starting ticks) are lower than target ticks, yield.
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
