@@ -373,11 +373,11 @@ thread_set_priority (int new_priority)
 {
   struct thread *t = thread_current ();
   t->base_priority = new_priority;
-  if(new_priority > t->priority)
-  {
-  	t->priority = new_priority;
-  }
+  t->priority = new_priority;
   ps_update( &ready_ps, t ); 
+  struct thread *th = ps_pull (&ready_ps);
+  if ( th->tid != t->tid ) 
+	  thread_yield ();
 }
 
 /* Returns the current thread's priority. */
