@@ -24,13 +24,18 @@ void ps_push( struct priority_scheduler * ps, struct thread * th ){
 	ps -> size++;
 	list_push_back( &ps -> lists[th -> priority], &th -> elem );
 	if(PS_DEBUG)printf("Inserting thread with priority %d; %s.\n", th -> priority, th -> name);
-	
-	if( th -> priority > thread_get_priority() ){
+
+	if (th->priority > ps->max_priority) {
+		ps->max_priority = th->priority;
+	}
+
+	// we cannot use this since in next_thread_to_run there's no runnig_thread
+	/*if( th -> priority > thread_get_priority() ){
 		if(PS_DEBUG)printf("Thread's priority %d greater then current running priority %d; %s. Yielding. \n", th -> priority, ps -> max_priority, th -> name );
 
 			ps -> max_priority = th -> priority;
 			if( thread_current() != th && ps -> size > 1 ) thread_yield();
-	}
+	}*/
 	if(PS_DEBUG) printf("Ps size: %d\n", ps -> size );
 	if(PS_DEBUG) printf("ps_push finished");
 }

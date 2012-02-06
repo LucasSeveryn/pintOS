@@ -12,6 +12,7 @@
 #include "threads/synch.h"
 #include "threads/vaddr.h"
 #include "threads/priority_scheduler.h"
+#include "devices/timer.h"
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
@@ -92,7 +93,7 @@ thread_init (void)
   ASSERT (intr_get_level () == INTR_OFF);
 
   lock_init (&tid_lock);
-  ps_init( &ready_ps );
+  ps_init (&ready_ps);
   //list_init (&ready_list);
   list_init (&all_list);
 
@@ -333,17 +334,19 @@ thread_yield (void)
 void
 thread_sleep (void) 
 {
-    struct thread *cur = thread_current ();
-    enum intr_level old_level;
-    
-    ASSERT (!intr_context ());
-    
-    old_level = intr_disable ();
-    if (cur != idle_thread) 
-        list_push_back (&ready_list, &cur->elem);
-    cur->status = THREAD_SLEEPING;
-    schedule ();
-    intr_set_level (old_level);
+  struct thread *cur = thread_current ();
+  enum intr_level old_level;
+  
+  ASSERT (!intr_context ());
+
+  old_level = intr_disable ();
+  if (cur != idle_thread){
+    //list_push_back (&ready_list, &cur->elem);
+    ps_push( &ready_ps, cur );
+  }
+  cur->status = THREAD_SLEEPING;
+  schedule ();
+  intr_set_level (old_level);
 }
 
 
@@ -374,7 +377,7 @@ thread_set_priority (int new_priority)
   {
   	t->priority = new_priority;
   }
-	ps_update( &ready_ps, thread_current() ); 
+  ps_update( &ready_ps, t ); 
 }
 
 /* Returns the current thread's priority. */
@@ -501,7 +504,8 @@ init_thread (struct thread *t, const char *name, int priority)
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
-
+  t->base_priority = priority;
+  list_init (&t->held_locks);
   t->magic = THREAD_MAGIC;
 
   old_level = intr_disable ();
@@ -530,11 +534,20 @@ alloc_frame (struct thread *t, size_t size)
 static struct thread *
 next_thread_to_run (void) 
 {
-  struct thread * th;
-  if ( ps_empty( &ready_ps ) )
+  struct thread *th;
+  if ( ps_empty (&ready_ps) )
     return idle_thread;
-  else{
-    th = ps_pop( &ready_ps );
+  else {
+    th = ps_pop (&ready_ps);
+	if ( th->status == THREAD_SLEEPING ) {
+		if ( th->time_to_wake > timer_ticks () ) {
+			struct thread *th2 = next_thread_to_run ();
+			ps_push ( &ready_ps, th );
+			return th2;
+		} else {
+			th->status = THREAD_READY;
+		}
+	}
     return th;
   }
 }
@@ -592,11 +605,6 @@ thread_schedule_tail (struct thread *prev)
 
    It's not safe to call printf() until thread_schedule_tail()
    has completed. */
-
-
-/* KURWA KURWA KURWA! Napisane bys zauwazyl. Za kazdym razem jak
- bierzesz next thread to run to trzeba sprawdzac stan czy nie jest 
- THREAD_SLEEPING i sprawdzac czy czasem nie pora go obudzic.*/
 static void
 schedule (void) 
 {

@@ -8,7 +8,6 @@
 #include "threads/synch.h"
 #include "threads/thread.h"
 
-/* lololo
 /* See [8254] for hardware details of the 8254 timer chip. */
 
 #if TIMER_FREQ < 19
@@ -82,7 +81,7 @@ timer_ticks (void)
 void
 set_wakeup_time (int64_t ticks_until_wakeup)
 {
-  thread_current ()->time_to_wake = ticks_until_wakeup + ticks;
+  thread_current ()->time_to_wake = ticks_until_wakeup + timer_ticks ();
 }
 
 /* Returns the number of timer ticks elapsed since THEN, which
