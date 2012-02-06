@@ -8,6 +8,7 @@
 /* States in a thread's life cycle. */
 enum thread_status
   {
+    THREAD_SLEEPING,    /* Sleeping thread. */
     THREAD_RUNNING,     /* Running thread. */
     THREAD_READY,       /* Not running but ready to run. */
     THREAD_BLOCKED,     /* Waiting for an event to trigger. */
@@ -89,6 +90,12 @@ struct thread
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
     struct list_elem allelem;           /* List element for all threads list. */
+    int64_t time_to_wake;               /* Absolute time after which thread will wake up. */
+
+	int base_priority;					/* priority set through set_priority */
+
+	struct list held_locks;				/* locks held by thread */
+	struct lock *blocked_on;			/* lock on which current thread is waiting */
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
@@ -125,6 +132,7 @@ const char *thread_name (void);
 
 void thread_exit (void) NO_RETURN;
 void thread_yield (void);
+void thread_sleep (void);
 
 /* Performs some operation on thread t, given auxiliary data AUX. */
 typedef void thread_action_func (struct thread *t, void *aux);
@@ -137,5 +145,7 @@ int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
+
+void set_wakeup_time (int64_t);
 
 #endif /* threads/thread.h */

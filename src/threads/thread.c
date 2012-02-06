@@ -328,6 +328,25 @@ thread_yield (void)
   intr_set_level (old_level);
 }
 
+/* Yields the CPU and sets the current thread status to 
+   THREAD_SLEEPING. */
+void
+thread_sleep (void) 
+{
+    struct thread *cur = thread_current ();
+    enum intr_level old_level;
+    
+    ASSERT (!intr_context ());
+    
+    old_level = intr_disable ();
+    if (cur != idle_thread) 
+        list_push_back (&ready_list, &cur->elem);
+    cur->status = THREAD_SLEEPING;
+    schedule ();
+    intr_set_level (old_level);
+}
+
+
 /* Invoke function 'func' on all threads, passing along 'aux'.
    This function must be called with interrupts off. */
 void
@@ -349,8 +368,13 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 thread_set_priority (int new_priority) 
 {
-  thread_current ()->priority = new_priority;
-  ps_update( &ready_ps, thread_current() ); 
+  struct thread *t = thread_current ();
+  t->base_priority = new_priority;
+  if(new_priority > t->priority)
+  {
+  	t->priority = new_priority;
+  }
+	ps_update( &ready_ps, thread_current() ); 
 }
 
 /* Returns the current thread's priority. */
@@ -477,6 +501,7 @@ init_thread (struct thread *t, const char *name, int priority)
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
+
   t->magic = THREAD_MAGIC;
 
   old_level = intr_disable ();
@@ -567,6 +592,11 @@ thread_schedule_tail (struct thread *prev)
 
    It's not safe to call printf() until thread_schedule_tail()
    has completed. */
+
+
+/* KURWA KURWA KURWA! Napisane bys zauwazyl. Za kazdym razem jak
+ bierzesz next thread to run to trzeba sprawdzac stan czy nie jest 
+ THREAD_SLEEPING i sprawdzac czy czasem nie pora go obudzic.*/
 static void
 schedule (void) 
 {
