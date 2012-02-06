@@ -14,6 +14,7 @@ kernel.bin: CPPFLAGS += -I$(SRCDIR)/lib/kernel
 # Core kernel.
 threads_SRC  = threads/start.S		# Startup code.
 threads_SRC += threads/init.c		# Main program.
+threads_SRC += threads/priority_scheduler.c			# Task 1 - priority scheduler.
 threads_SRC += threads/thread.c		# Thread management core.
 threads_SRC += threads/switch.S		# Thread switch routine.
 threads_SRC += threads/interrupt.c	# Interrupt core.
