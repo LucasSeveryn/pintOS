@@ -374,12 +374,14 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 thread_set_priority (int new_priority) 
 {
+
   struct thread *t = thread_current ();
   t->base_priority = new_priority;
   t->priority = new_priority;
-  ps_update( &ready_ps, t ); 
+
   struct thread *th = ps_pop (&ready_ps);
   ps_push (&ready_ps, th);
+
   if ( th->priority > new_priority )
 	  thread_yield ();
 }
