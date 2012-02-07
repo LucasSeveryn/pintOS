@@ -47,7 +47,7 @@ struct thread * ps_pop( struct priority_scheduler * ps ){
 	ASSERT( ! ps_empty( ps ) );
 
 	ps -> size--;
-	if(PS_DEBUG) printf("ps_pop started");
+	//if(PS_DEBUG) printf("ps_pop started");
 	struct list_elem * el;
 	struct thread * th;
 	int i;
@@ -55,7 +55,7 @@ struct thread * ps_pop( struct priority_scheduler * ps ){
 		if( !list_empty( &ps -> lists[i] ) ){
 			el = list_pop_front( &ps -> lists[i] );
 			th = list_entry( el, struct thread, elem );
-			if(PS_DEBUG) printf("Popping tread with highest priority (%d); %s. \n", th -> priority, th -> name );
+	//		if(PS_DEBUG) printf("Popping tread with highest priority (%d); %s. \n", th -> priority, th -> name );
 			int j;
 			for( j = i; j >=0 ; j-- ){
 				if( !list_empty( &ps -> lists[j] ) ){
@@ -66,8 +66,8 @@ struct thread * ps_pop( struct priority_scheduler * ps ){
 			break;
 		}
 	}
-	if(PS_DEBUG) printf("Ps size: %d\n", ps -> size );
-	if(PS_DEBUG) printf("ps_pop finished");
+	//if(PS_DEBUG) printf("Ps size: %d\n", ps -> size );
+	//if(PS_DEBUG) printf("ps_pop finished");
 	return th;
 }
 
