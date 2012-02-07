@@ -74,6 +74,7 @@ struct thread * ps_pull( struct priority_scheduler * ps ){
 	for( i = ps -> max_priority; i >=  0; i-- ){
 		if( !list_empty( &ps -> lists[i] ) ){
 			el = list_front( &ps -> lists[i] );
+			break;
 		}
 	}
 	th = list_entry( el, struct thread, elem );
