@@ -212,6 +212,9 @@ thread_create (const char *name, int priority,
 
   /* Add to run queue. */
   thread_unblock (t);
+  
+  if ( t->priority > thread_get_priority () ) 
+	  thread_yield ();
 
   return tid;
 }
@@ -375,8 +378,9 @@ thread_set_priority (int new_priority)
   t->base_priority = new_priority;
   t->priority = new_priority;
   ps_update( &ready_ps, t ); 
-  struct thread *th = ps_pull (&ready_ps);
-  if ( th->tid != t->tid ) 
+  struct thread *th = ps_pop (&ready_ps);
+  ps_push (&ready_ps, th);
+  if ( th->priority > new_priority )
 	  thread_yield ();
 }
 

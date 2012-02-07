@@ -26,24 +26,24 @@ void ps_push( struct priority_scheduler * ps, struct thread * th ){
 	if(PS_DEBUG)printf("Inserting thread with priority %d; %s.\n", th -> priority, th -> name);
 
 	if (th->priority > ps->max_priority) {
+		if(PS_DEBUG)printf("Thread's priority %d greater then current running priority %d; %s. Yielding. \n", th -> priority, ps -> max_priority, th -> name );
 		ps->max_priority = th->priority;
 	}
 
 	// we cannot use this since in next_thread_to_run there's no runnig_thread
 	/*if( th -> priority > thread_get_priority() ){
-		if(PS_DEBUG)printf("Thread's priority %d greater then current running priority %d; %s. Yielding. \n", th -> priority, ps -> max_priority, th -> name );
 
 			ps -> max_priority = th -> priority;
 			if( thread_current() != th && ps -> size > 1 ) thread_yield();
 	}*/
 	if(PS_DEBUG) printf("Ps size: %d\n", ps -> size );
-	if(PS_DEBUG) printf("ps_push finished");
+	if(PS_DEBUG) printf("ps_push finished\n");
 }
 
 /* Highest priority */
 struct thread * ps_pop( struct priority_scheduler * ps ){
 	ps -> size--;
-	//if(PS_DEBUG) printf("ps_pop started");
+	if(PS_DEBUG) printf("ps_pop started");
 	struct list_elem * el;
 	struct thread * th;
 	int i;
@@ -51,7 +51,7 @@ struct thread * ps_pop( struct priority_scheduler * ps ){
 		if( !list_empty( &ps -> lists[i] ) ){
 			el = list_pop_front( &ps -> lists[i] );
 			th = list_entry( el, struct thread, elem );
-			//if(PS_DEBUG) printf("Popping tread with highest priority (%d); %s. \n", th -> priority, th -> name );
+			if(PS_DEBUG) printf("Popping tread with highest priority (%d); %s. \n", th -> priority, th -> name );
 			int j;
 			for( j = i; j >=0 ; j-- ){
 				if( !list_empty( &ps -> lists[j] ) ){
@@ -62,8 +62,8 @@ struct thread * ps_pop( struct priority_scheduler * ps ){
 			break;
 		}
 	}
-	//f(PS_DEBUG) printf("Ps size: %d\n", ps -> size );
-	//if(PS_DEBUG) printf("ps_pop finished");
+	if(PS_DEBUG) printf("Ps size: %d\n", ps -> size );
+	if(PS_DEBUG) printf("ps_pop finished");
 	return th;
 }
 
@@ -86,5 +86,6 @@ struct thread * ps_pull( struct priority_scheduler * ps ){
 void ps_update( struct priority_scheduler * ps, struct thread * th){
 	if(PS_DEBUG)printf("Updating tread's position in the ps; priority (%d); %s. \n", th -> priority, th -> name );
 	list_remove( &th -> elem );
+	ps->size--;
 	ps_push( ps, th );
 }
