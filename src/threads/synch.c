@@ -294,8 +294,12 @@ donate_priority (const struct lock *lock)
   if( lock_owner->priority < current_thread->priority )
   	thread_set_waiting_thread_priority (lock_owner, current_thread->priority);
 
-  if( lock_owner->status == THREAD_BLOCKED && lock_owner->blocked_on != NULL ) {
+  if( lock_owner->status == THREAD_BLOCKED && lock_owner->blocked_on != NULL )
   	donate_priority (lock_owner->blocked_on);
+
+  if( lock_owner->status == THREAD_BLOCKED && lock_owner->waiting_on != NULL ) {
+    list_remove (&lock_owner->elem);
+    list_insert_ordered (&lock_owner->waiting_on->waiters, &lock_owner->elem, &order_by_priority, NULL);
   }
 }
 
