@@ -32,6 +32,15 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 
+/* Function for ordering waiting threads by priority */
+bool 
+order_by_priority (const struct list_elem *a, const struct list_elem *b, void *aux)
+{
+  struct thread *tha = list_entry(a, struct thread, elem);
+  struct thread *thb = list_entry(b, struct thread, elem);
+  return tha->priority > thb->priority;
+}
+
 /* Initializes semaphore SEMA to VALUE.  A semaphore is a
    nonnegative integer along with two atomic operators for
    manipulating it:
@@ -68,7 +77,7 @@ sema_down (struct semaphore *sema)
   old_level = intr_disable ();
   while (sema->value == 0) 
     {
-      list_push_back (&sema->waiters, &thread_current ()->elem);
+      list_insert_ordered (&sema->waiters, &thread_current ()->elem, &order_by_priority, NULL);
       thread_block ();
     }
   sema->value--;
@@ -156,7 +165,7 @@ sema_test_helper (void *sema_)
       sema_up (&sema[1]);
     }
 }
-
+
 /* Initializes LOCK.  A lock can be held by at most a single
    thread at any given time.  Our locks are not "recursive", that
    is, it is an error for the thread currently holding a lock to
@@ -192,7 +201,6 @@ lock_init (struct lock *lock)
 void
 lock_acquire (struct lock *lock)
 {
-  bool acquired_lock;
   struct thread * t;
 
   ASSERT (lock != NULL);
@@ -201,13 +209,11 @@ lock_acquire (struct lock *lock)
 
   t = thread_current ();
   
-  acquired_lock = sema_try_down (&lock->semaphore);
-  if(!acquired_lock) {
-	t->blocked_on = lock;
+  if(lock->holder != NULL) {
+	  t->blocked_on = lock;
   	donate_priority(lock);
-	sema_down(&lock->semaphore);
   }
-  
+  sema_down(&lock->semaphore);
   list_push_front(&t->held_locks, &lock->lock_elem); //change to insert in order
   lock->holder = t;
 }
@@ -240,13 +246,17 @@ lock_try_acquire (struct lock *lock)
 void
 lock_release (struct lock *lock) 
 {
+  
   ASSERT (lock != NULL);
   ASSERT (lock_held_by_current_thread (lock));
-  
+
   list_remove (&lock->lock_elem);
-  recompute_priority(); 
+
   lock->holder = NULL;
   sema_up (&lock->semaphore);
+  int new_priority = recompute_priority(); 
+  thread_set_waiting_thread_priority (thread_current (), new_priority);
+
 }
 
 /* Returns true if the current thread holds LOCK, false
@@ -271,7 +281,7 @@ donate_priority (const struct lock *lock)
   struct thread *current_thread = thread_current ();
   
   if( lock_owner->priority < current_thread->priority )
-  	lock_owner->priority = current_thread->priority;
+  	thread_set_waiting_thread_priority (lock_owner, current_thread->priority);
 
   if( lock_owner->status == THREAD_BLOCKED && lock_owner->blocked_on != NULL ) {
   	donate_priority (lock_owner->blocked_on);
@@ -279,31 +289,32 @@ donate_priority (const struct lock *lock)
 }
 
 /* Recomputes new priority of a thread after it has released a lock. */
-void
+int
 recompute_priority () 
 {
   struct thread *t = thread_current ();
   struct list *held_locks = &t->held_locks; 
   struct list_elem *e;
 
+  int new_priority = t->base_priority;
+
   for (e = list_begin (held_locks); e != list_end (held_locks); 
 		  e = list_next (e))
   {
   	struct lock *lock = list_entry (e, struct lock, lock_elem);
-	struct list *waiters = &lock->semaphore.waiters;
-	struct list_elem *thread;
-	for (thread = list_begin (waiters); thread != list_end (waiters); 
-			thread = list_next (thread))
-	{
-	  struct thread *waiting_thread = list_entry (thread, struct thread, elem);
-	  if (waiting_thread->priority > t->priority)
-		  t->priority = waiting_thread->priority;
-	}
+	  struct list *waiters = &lock->semaphore.waiters;
+	  struct list_elem *thread;
+  	for (thread = list_begin (waiters); thread != list_end (waiters); 
+  			thread = list_next (thread))
+  	{
+  	  struct thread *waiting_thread = list_entry (thread, struct thread, elem);
+  	  if (waiting_thread->priority > new_priority)
+  	    new_priority = waiting_thread->priority;
+    }
   }
-  if (t->priority < t->base_priority) 
-	  t->priority = t->base_priority;
+  return new_priority;
 }
-
+
 /* One semaphore in a list. */
 struct semaphore_elem 
   {

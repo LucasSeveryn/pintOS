@@ -370,17 +370,48 @@ thread_foreach (thread_action_func *func, void *aux)
     }
 }
 
+void
+thread_set_waiting_thread_priority (struct thread *t, int new_priority) 
+{
+
+  enum intr_level old_level;
+  if (t->status != THREAD_RUNNING) 
+  {
+    t->priority = new_priority;
+    
+    if (t->status == THREAD_READY) {
+     old_level = intr_disable ();
+     ps_update (&ready_ps, t);
+     intr_set_level (old_level);
+    }
+  } else {
+    if (!ps_empty (&ready_ps)) {
+      t->priority = new_priority;
+
+      old_level = intr_disable ();
+      struct thread *th = ps_pop (&ready_ps);
+      ps_push (&ready_ps, th);
+      intr_set_level (old_level);
+
+      if ( th->priority > new_priority )
+        thread_yield ();
+    }
+  }
+}
+
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
 thread_set_priority (int new_priority) 
 {
-
+  enum intr_level old_level;
   struct thread *t = thread_current ();
   t->base_priority = new_priority;
   t->priority = new_priority;
 
+  old_level = intr_disable ();
   struct thread *th = ps_pop (&ready_ps);
   ps_push (&ready_ps, th);
+  intr_set_level (old_level);
 
   if ( th->priority > new_priority )
 	  thread_yield ();
