@@ -212,6 +212,7 @@ lock_acquire (struct lock *lock)
   if(lock->holder != NULL) {
 	  t->blocked_on = lock;
   	donate_priority(lock);
+    
   }
   sema_down(&lock->semaphore);
   list_push_front(&t->held_locks, &lock->lock_elem); //change to insert in order

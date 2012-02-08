@@ -306,6 +306,7 @@ thread_exit (void)
      and schedule another process.  That process will destroy us
      when it calls thread_schedule_tail(). */
   intr_disable ();
+  //ps_pop( &ready_ps );
   list_remove (&thread_current()->allelem);
   thread_current ()->status = THREAD_DYING;
   schedule ();
@@ -410,8 +411,9 @@ thread_set_priority (int new_priority)
 
   old_level = intr_disable ();
   struct thread *th = ps_pop (&ready_ps);
-  ps_push (&ready_ps, th);
   intr_set_level (old_level);
+  ps_push (&ready_ps, th);
+  
 
   if ( th->priority > new_priority )
 	  thread_yield ();
@@ -426,17 +428,29 @@ thread_get_priority (void)
 
 /* Sets the current thread's nice value to NICE. */
 void
-thread_set_nice (int nice UNUSED) 
+thread_set_nice (int new_nice) 
 {
-  /* Not yet implemented. */
+
+  enum intr_level old_level = intr_disable ();
+  struct thread *t = thread_current ();
+  t -> nice = new_nice;
+
+  struct thread *th = ps_pop (&ready_ps);
+  intr_set_level (old_level);
+
+  ps_push (&ready_ps, th);
+  
+  int new_priority = 0;
+
+  if ( th -> priority > new_priority )
+    thread_yield ();
 }
 
 /* Returns the current thread's nice value. */
 int
 thread_get_nice (void) 
 {
-  /* Not yet implemented. */
-  return 0;
+  return thread_current () -> nice;
 }
 
 /* Returns 100 times the system load average. */
@@ -542,6 +556,7 @@ init_thread (struct thread *t, const char *name, int priority)
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
   t->base_priority = priority;
+  t -> nice = 0;
   list_init (&t->held_locks);
   t->magic = THREAD_MAGIC;
 

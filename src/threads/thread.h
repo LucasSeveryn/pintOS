@@ -90,8 +90,10 @@ struct thread
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
     struct list_elem allelem;           /* List element for all threads list. */
+    struct priority_scheduler * pss;    /* Pointer to a queue it belongs to */
     int64_t time_to_wake;               /* Absolute time after which thread will wake up. */
 
+    int nice;                 /* 4.4BSD SCH - nice value */
 	int base_priority;					/* priority set through set_priority */
 
 	struct list held_locks;				/* locks held by thread */

@@ -21,6 +21,9 @@ void ps_push( struct priority_scheduler *, struct thread * );
 struct thread * ps_pop( struct priority_scheduler * );
 struct thread * ps_pull( struct priority_scheduler * );
 
+bool ps_contains( struct priority_scheduler *, struct thread * );
+
+void ps_update_auto( struct thread * );
 void ps_update( struct priority_scheduler *, struct thread * );
 
 #endif
