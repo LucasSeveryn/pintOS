@@ -93,11 +93,13 @@ struct thread
     struct priority_scheduler * pss;    /* Pointer to a queue it belongs to */
     int64_t time_to_wake;               /* Absolute time after which thread will wake up. */
 
-    int nice;                 /* 4.4BSD SCH - nice value */
-	int base_priority;					/* priority set through set_priority */
+	    int nice;                 /* 4.4BSD SCH - nice value */
+	  int base_priority;					        /* priority set through set_priority */
+    bool is_donated;                    /* whether current priority is donated */
 
-	struct list held_locks;				/* locks held by thread */
-	struct lock *blocked_on;			/* lock on which current thread is waiting */
+  	struct list held_locks;			      	/* locks held by thread */
+  	struct lock *blocked_on;			      /* lock on which current thread is waiting */
+    struct semaphore *waiting_on;        /* semaphore on which our thread is waiting */
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */

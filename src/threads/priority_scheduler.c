@@ -69,8 +69,6 @@ struct thread * ps_pop( struct priority_scheduler * ps ){
 }
 
 struct thread * ps_pull( struct priority_scheduler * ps ){
-	ASSERT( ! ps_empty( ps ) );
-
 	struct list_elem * el;
 	struct thread * th;
 	int i;

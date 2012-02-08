@@ -306,7 +306,7 @@ thread_exit (void)
      and schedule another process.  That process will destroy us
      when it calls thread_schedule_tail(). */
   intr_disable ();
-  //ps_pop( &ready_ps );
+
   list_remove (&thread_current()->allelem);
   thread_current ()->status = THREAD_DYING;
   schedule ();
@@ -376,10 +376,14 @@ thread_set_waiting_thread_priority (struct thread *t, int new_priority)
 {
 
   enum intr_level old_level;
+  if (t->base_priority >= new_priority)
+    t->is_donated = false;
+  else 
+    t->is_donated = true;
   if (t->status != THREAD_RUNNING) 
   {
     t->priority = new_priority;
-    
+
     if (t->status == THREAD_READY) {
      old_level = intr_disable ();
      ps_update (&ready_ps, t);
@@ -389,10 +393,7 @@ thread_set_waiting_thread_priority (struct thread *t, int new_priority)
     if (!ps_empty (&ready_ps)) {
       t->priority = new_priority;
 
-      old_level = intr_disable ();
-      struct thread *th = ps_pop (&ready_ps);
-      ps_push (&ready_ps, th);
-      intr_set_level (old_level);
+      struct thread *th = ps_pull (&ready_ps);
 
       if ( th->priority > new_priority )
         thread_yield ();
@@ -405,17 +406,20 @@ void
 thread_set_priority (int new_priority) 
 {
   enum intr_level old_level;
+  struct thread *th;
+  old_level = intr_disable ();
+
   struct thread *t = thread_current ();
   t->base_priority = new_priority;
-  t->priority = new_priority;
+  if (!t->is_donated) 
+    t->priority = new_priority;
 
-  old_level = intr_disable ();
-  struct thread *th = ps_pop (&ready_ps);
+  if (!ps_empty (&ready_ps))
+    th = ps_pull (&ready_ps);
+
   intr_set_level (old_level);
-  ps_push (&ready_ps, th);
-  
 
-  if ( th->priority > new_priority )
+  if ( !ps_empty (&ready_ps) && th->priority > new_priority )
 	  thread_yield ();
 }
 
@@ -556,6 +560,7 @@ init_thread (struct thread *t, const char *name, int priority)
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
   t->base_priority = priority;
+  t->is_donated = false;
   t -> nice = 0;
   list_init (&t->held_locks);
   t->magic = THREAD_MAGIC;
