@@ -20,7 +20,7 @@ TAGS::
 	etags --members `$(TAGS_SOURCES)`
 
 tags::
-	ctags `$(TAGS_SOURCES)`
+	ctags -f .tags `$(TAGS_SOURCES)`
 
 cscope.files::
 	$(TAGS_SOURCES) > cscope.files
