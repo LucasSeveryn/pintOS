@@ -8,6 +8,7 @@ struct priority_scheduler{
 	struct list lists[PRI_MAX + 1];
 	int max_priority;
 	int size;
+	int sleeping;
 };
 
 bool ps_empty( struct priority_scheduler * );

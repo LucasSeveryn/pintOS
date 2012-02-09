@@ -113,6 +113,8 @@ thread_init (void)
   
   if ( thread_mlfqs ) {
     thread_recalculate_priority( initial_thread, NULL);
+    int x = F_TO_INT_NEAREST(F_MUL_INT(F_DIV_INT(F_TO_FIXED(1), 60), 100));
+    //printf("%d\n", x);
   }
 
   initial_thread->status = THREAD_RUNNING;
@@ -141,7 +143,7 @@ thread_start (void)
 /* Called by the timer interrupt handler at each timer tick.
    Thus, this function runs in an external interrupt context. */
 void
-thread_tick (void) 
+(thread_current() != idle_thread) (void) 
 {
   struct thread *t = thread_current ();
 
@@ -167,12 +169,12 @@ thread_tick (void)
     void (*fp)(struct thread *, void *);
     fp = thread_recalculate_recent_cpu;
 
-    load_avg = F_ADD(F_MUL(F_DIV_INT(F_TO_FIXED(59), 60), load_avg), F_MUL(F_DIV_INT(F_TO_FIXED(1), 60), (ready_ps.size + 1)));
+    load_avg = F_ADD(F_MUL(F_DIV_INT(F_TO_FIXED(59), 60), load_avg), F_MUL_INT(F_DIV_INT(F_TO_FIXED(1), 60), (ready_ps.size - ready_ps.sleeping + (thread_current() == idle_thread))));
     thread_foreach ( fp, NULL );
-
+    //printf("L:%d R:%d Ready:%d ps.size:%d ps.sleeping:%d\n", thread_get_load_avg(), thread_get_recent_cpu(), ready_ps.size - ready_ps.sleeping + (thread_current() != idle_thread), ready_ps.size, ready_ps.sleeping);
   }
 
-  if ( thread_mlfqs && thread_ticks % 4 == 0) {
+  if ( thread_mlfqs && timer_ticks() % 4 == 0) {
     void (*fp)(struct thread *, void *);
     fp = thread_recalculate_priority;
 
@@ -394,6 +396,7 @@ thread_sleep (void)
     ps_push( &ready_ps, cur );
   }
   cur->status = THREAD_SLEEPING;
+  ready_ps.sleeping++;
   schedule ();
   intr_set_level (old_level);
 }
@@ -663,6 +666,7 @@ next_thread_to_run (void)
 			return th2;
 		} else {
 			th->status = THREAD_READY;
+      ready_ps.sleeping--;
 		}
 	}
     return th;

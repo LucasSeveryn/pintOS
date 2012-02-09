@@ -7,6 +7,7 @@
 void ps_init( struct priority_scheduler * ps ){
 	ps -> max_priority = PRI_MIN;
 	ps -> size = 0;
+	ps -> sleeping = 0;
 
 	int i;
 	for( i = PRI_MAX; i >=  0; i-- ){
