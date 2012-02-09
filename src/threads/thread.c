@@ -1,4 +1,4 @@
-#include "threads/thread.h"
+ #include "threads/thread.h"
 #include <debug.h>
 #include <stddef.h>
 #include <random.h>
@@ -380,19 +380,18 @@ thread_set_waiting_thread_priority (struct thread *t, int new_priority)
     t->is_donated = false;
   else 
     t->is_donated = true;
+
   if (t->status != THREAD_RUNNING) 
   {
     t->priority = new_priority;
 
     if (t->status == THREAD_READY) {
-     old_level = intr_disable ();
      ps_update (&ready_ps, t);
-     intr_set_level (old_level);
     }
   } else {
-    if (!ps_empty (&ready_ps)) {
-      t->priority = new_priority;
-
+    t->priority = new_priority;
+    if (!ps_empty (&ready_ps)) 
+    {
       struct thread *th = ps_pull (&ready_ps);
 
       if ( th->priority > new_priority )
@@ -410,14 +409,15 @@ thread_set_priority (int new_priority)
   old_level = intr_disable ();
 
   struct thread *t = thread_current ();
+
   t->base_priority = new_priority;
   if (!t->is_donated) 
     t->priority = new_priority;
 
+  intr_set_level (old_level);
+
   if (!ps_empty (&ready_ps))
     th = ps_pull (&ready_ps);
-
-  intr_set_level (old_level);
 
   if ( !ps_empty (&ready_ps) && th->priority > new_priority )
 	  thread_yield ();
@@ -592,10 +592,12 @@ static struct thread *
 next_thread_to_run (void) 
 {
   struct thread *th;
+  
   if ( ps_empty (&ready_ps) )
     return idle_thread;
   else {
     th = ps_pop (&ready_ps);
+
 	if ( th->status == THREAD_SLEEPING ) {
 		if ( th->time_to_wake > timer_ticks () ) {
 			struct thread *th2 = next_thread_to_run ();
