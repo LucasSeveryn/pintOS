@@ -79,9 +79,9 @@ timer_ticks (void)
 /* Sets current thread wakeup time to absolute time after 
    TICKS ticks */
 void
-set_wakeup_time (int64_t ticks_until_wakeup)
+set_wakeup_time (int64_t from, int64_t ticks_until_wakeup)
 {
-  thread_current ()->time_to_wake = ticks_until_wakeup + timer_ticks ();
+  thread_current ()->time_to_wake = ticks_until_wakeup + from;
 }
 
 /* Returns the number of timer ticks elapsed since THEN, which
@@ -97,7 +97,8 @@ timer_elapsed (int64_t then)
 void
 timer_sleep (int64_t ticks) //set sleep for ticks time.
 {
-  set_wakeup_time(ticks);
+  int64_t from = timer_ticks();
+  set_wakeup_time(from, ticks);
   thread_sleep();
 }
 

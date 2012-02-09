@@ -75,6 +75,7 @@ static void *alloc_frame (struct thread *, size_t size);
 static void schedule (void);
 void thread_schedule_tail (struct thread *prev);
 void thread_recalculate_recent_cpu( struct thread * , void * );
+void thread_wakeup( struct thread *, void * );
 void thread_recalculate_priority( struct thread * , void * );
 static tid_t allocate_tid (void);
 
@@ -113,7 +114,7 @@ thread_init (void)
   
   if ( thread_mlfqs ) {
     thread_recalculate_priority( initial_thread, NULL);
-    int x = F_TO_INT_NEAREST(F_MUL_INT(F_DIV_INT(F_TO_FIXED(1), 60), 100));
+    //int x = F_TO_INT_NEAREST(F_MUL_INT(F_DIV_INT(F_TO_FIXED(1), 60), 100));
     //printf("%d\n", x);
   }
 
@@ -143,10 +144,10 @@ thread_start (void)
 /* Called by the timer interrupt handler at each timer tick.
    Thus, this function runs in an external interrupt context. */
 void
-(thread_current() != idle_thread) (void) 
+thread_tick (void) 
 {
   struct thread *t = thread_current ();
-
+  struct thread *th;
   /* Update statistics. */
   if (t == idle_thread)
     idle_ticks++;
@@ -164,25 +165,26 @@ void
     t -> recent_cpu = F_ADD_INT(t -> recent_cpu, 1);
   }
 
+
+  if ( thread_mlfqs ) {
+    thread_foreach( &thread_wakeup, NULL );
+  }
   
   if ( thread_mlfqs && timer_ticks() % TIMER_FREQ == 0 ) {
-    void (*fp)(struct thread *, void *);
-    fp = thread_recalculate_recent_cpu;
-
-    load_avg = F_ADD(F_MUL(F_DIV_INT(F_TO_FIXED(59), 60), load_avg), F_MUL_INT(F_DIV_INT(F_TO_FIXED(1), 60), (ready_ps.size - ready_ps.sleeping + (thread_current() == idle_thread))));
-    thread_foreach ( fp, NULL );
+    thread_foreach ( &thread_recalculate_recent_cpu, NULL );
+    load_avg = F_ADD(F_MUL(F_DIV_INT(F_TO_FIXED(59), 60), load_avg), F_MUL_INT(F_DIV_INT(F_TO_FIXED(1), 60), (ready_ps.size - ready_ps.sleeping + (thread_current() != idle_thread))));
     //printf("L:%d R:%d Ready:%d ps.size:%d ps.sleeping:%d\n", thread_get_load_avg(), thread_get_recent_cpu(), ready_ps.size - ready_ps.sleeping + (thread_current() != idle_thread), ready_ps.size, ready_ps.sleeping);
   }
 
   if ( thread_mlfqs && timer_ticks() % 4 == 0) {
-    void (*fp)(struct thread *, void *);
-    fp = thread_recalculate_priority;
-
-    thread_foreach ( fp, NULL );
+    thread_foreach ( thread_recalculate_priority, NULL );
   }
 
+  if (!ps_empty (&ready_ps))
+    th = ps_pull (&ready_ps);
+
   /* Enforce preemption. */
-  if (thread_ticks >= TIME_SLICE)
+  if ((!ps_empty (&ready_ps) && th->priority > t->priority) || thread_ticks >= TIME_SLICE)
     intr_yield_on_return ();
 }
 
@@ -214,7 +216,6 @@ thread_create (const char *name, int priority,
                thread_func *function, void *aux) 
 {
   struct thread * t;
-  struct thread * th;
   struct kernel_thread_frame *kf;
   struct switch_entry_frame *ef;
   struct switch_threads_frame *sf;
@@ -236,10 +237,6 @@ thread_create (const char *name, int priority,
      Do this atomically so intermediate values for the 'stack' 
      member cannot be observed. */
   old_level = intr_disable ();
-
-  th = thread_current();
-
-
 
   /* Stack frame for kernel_thread(). */
   kf = alloc_frame (t, sizeof *kf);
@@ -403,18 +400,30 @@ thread_sleep (void)
 
 void 
 thread_recalculate_recent_cpu( struct thread * t, void * d UNUSED ){
-  t->recent_cpu = F_ADD_INT( F_MUL( F_DIV( F_MUL_INT( load_avg, 2 ), F_ADD_INT( F_MUL_INT( load_avg, 2 ), 1 ) ), t -> recent_cpu), t -> nice);
+    t->recent_cpu = F_ADD_INT( F_MUL( F_DIV( F_MUL_INT( load_avg, 2 ), F_ADD_INT( F_MUL_INT( load_avg, 2 ), 1 ) ), t -> recent_cpu), t -> nice);
+}
+
+void
+thread_wakeup( struct thread *t, void *d UNUSED ) {
+  if( t->status == THREAD_SLEEPING && t->time_to_wake <= timer_ticks() ) {
+    t->status = THREAD_READY;
+    t->pss->sleeping--;
+  }
 }
 
 void 
 thread_recalculate_priority( struct thread * t, void * d UNUSED ){
-  t->priority = PRI_MAX - F_TO_INT( F_SUB_INT( F_DIV_INT( t -> recent_cpu, 4 ), t -> nice * 2 ) );
-  if(t->priority<PRI_MIN) t->priority = PRI_MIN;
-  if(t->priority>PRI_MAX) t->priority = PRI_MAX;
-  t->base_priority = t->priority;
-
-  ps_update_auto( t );
+  if( t->status != THREAD_SLEEPING ) {
+    t->priority = PRI_MAX - F_TO_INT( F_ADD_INT( F_DIV_INT( t -> recent_cpu, 4 ), t -> nice * 2 ) );
+    if(t->priority<PRI_MIN) t->priority = PRI_MIN;
+    if(t->priority>PRI_MAX) t->priority = PRI_MAX;
+    t->base_priority = t->priority;
+    
+    /* Update position in the queue */
+    ps_update_auto( t );
+  }
 }
+
 /* Invoke function 'func' on all threads, passing along 'aux'.
    This function must be called with interrupts off. */
 void
@@ -436,7 +445,6 @@ void
 thread_set_waiting_thread_priority (struct thread *t, int new_priority) 
 {
 
-  enum intr_level old_level;
   if (t->base_priority >= new_priority)
     t->is_donated = false;
   else 
@@ -495,16 +503,19 @@ thread_get_priority (void)
 void
 thread_set_nice (int new_nice) 
 {
-
-
   /* We want to make sure that we will change priority of the correct thread */
   enum intr_level old_level;
+  struct thread *th;
   old_level = intr_disable ();
   struct thread *t;
   t = thread_current ();
   t -> nice = new_nice;
   thread_recalculate_priority( t, NULL);
-  thread_set_priority( t -> priority );
+  if (!ps_empty (&ready_ps))
+    th = ps_pull (&ready_ps);
+
+  if ( !ps_empty (&ready_ps) && th->priority > t->priority )
+    thread_yield ();
   intr_set_level (old_level);
 }
 
