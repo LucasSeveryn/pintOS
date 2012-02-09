@@ -1,4 +1,5 @@
 #include "threads/priority_scheduler.h"
+#include "threads/interrupt.h"
 #include <stdio.h>
 
 #define PS_DEBUG false
@@ -40,7 +41,7 @@ void ps_push( struct priority_scheduler * ps, struct thread * th ){
 
 /* Highest priority */
 struct thread * ps_pop( struct priority_scheduler * ps ){
-	//ASSERT( ! ps_empty( ps ) );
+	ASSERT( ! ps_empty( ps ) );
 
 	ps -> size--;
 	//if(PS_DEBUG) printf("ps_pop started");
@@ -69,6 +70,8 @@ struct thread * ps_pop( struct priority_scheduler * ps ){
 }
 
 struct thread * ps_pull( struct priority_scheduler * ps ){
+	ASSERT( ! ps_empty( ps ) );
+
 	struct list_elem * el;
 	struct thread * th;
 	int i;
@@ -80,7 +83,7 @@ struct thread * ps_pull( struct priority_scheduler * ps ){
 		}
 	}
 
-	if(PS_DEBUG) printf("Pulling tread with highest priority (%d); %s. \n", th -> priority, th -> name );
+	if(PS_DEBUG) printf("Pulling thread with highest priority (%d); %s. \n", th -> priority, th -> name );
 	
 	return th;
 }
@@ -93,15 +96,15 @@ bool ps_contains( struct priority_scheduler * ps, struct thread * th){
 }
 
 void ps_update_auto( struct thread * th){
-	if(PS_DEBUG)printf("Updating tread's position in the ps; priority (%d); %s. \n", th -> priority, th -> name );
+	if(PS_DEBUG)printf("Updating thread's position in the ps; priority (%d); %s. \n", th -> priority, th -> name );
 
 	struct priority_scheduler * ps = th -> pss;
 
-	ASSERT( ps != NULL );
-	
-	list_remove( &th -> elem );
-	ps -> size--;
-	ps_push( ps, th );
+	if( ps != NULL ){
+		list_remove( &th -> elem );
+		ps -> size--;
+		ps_push( ps, th );
+	}
 }
 
 void ps_update( struct priority_scheduler * ps, struct thread * th){

@@ -40,6 +40,8 @@ static struct thread *initial_thread;
 /* Lock used by allocate_tid(). */
 static struct lock tid_lock;
 
+static FIXED load_avg;          /* System load average  */
+
 /* Stack frame for kernel_thread(). */
 struct kernel_thread_frame 
   {
@@ -72,6 +74,8 @@ static bool is_thread (struct thread *) UNUSED;
 static void *alloc_frame (struct thread *, size_t size);
 static void schedule (void);
 void thread_schedule_tail (struct thread *prev);
+void thread_recalculate_recent_cpu( struct thread * , void * );
+void thread_recalculate_priority( struct thread * , void * );
 static tid_t allocate_tid (void);
 
 /* Initializes the threading system by transforming the code
@@ -97,11 +101,34 @@ thread_init (void)
   //list_init (&ready_list);
   list_init (&all_list);
 
+  load_avg = 0;
+
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
+
   init_thread (initial_thread, "main", PRI_DEFAULT);
+  
+  initial_thread -> nice = 0;
+  initial_thread -> recent_cpu = 0;
+  
+  if ( thread_mlfqs ) {
+    initial_thread -> priority = PRI_MAX - F_TO_INT_NEAREST( F_DIV_INT( initial_thread -> recent_cpu, 4 ) );
+    printf("%d\n", F_TO_INT_NEAREST( F_DIV_INT( initial_thread -> recent_cpu, 4 ) ));
+    printf("%d\n", F_TO_INT( F_TO_FIXED( 3 )));
+    printf("%d\n", F_TO_INT_NEAREST( F_TO_FIXED( 3 )));
+    printf("%d\n", F_TO_INT_NEAREST( F_MUL( F_TO_FIXED( 3 ), F_TO_FIXED( 3 ))));
+    printf("%d\n", F_TO_INT_NEAREST( F_ADD( F_TO_FIXED( 3 ), F_TO_FIXED( 3 ))));
+    printf("%d\n", F_TO_INT_NEAREST( F_SUB( F_TO_FIXED( 3 ), F_TO_FIXED( 3 ))));
+    printf("%d\n", F_TO_INT_NEAREST( F_DIV( F_TO_FIXED( 3 ), F_TO_FIXED( 3 ))));
+    printf("%d\n", F_TO_INT_NEAREST( F_MUL_INT( F_TO_FIXED( 3 ),  3 )));
+    printf("%d\n", F_TO_INT_NEAREST( F_ADD_INT( F_TO_FIXED( 3 ),  3 )));
+    //ps_update_auto( initial_thread );
+  }
+
   initial_thread->status = THREAD_RUNNING;
   initial_thread->tid = allocate_tid ();
+
+  //printf("ITP:%d\n", initial_thread -> priority);
 }
 
 /* Starts preemptive thread scheduling by enabling interrupts.
@@ -138,8 +165,34 @@ thread_tick (void)
   else
     kernel_ticks++;
 
+
+  thread_ticks++;
+
+  if (t != idle_thread){
+    t -> recent_cpu = F_ADD_INT(t -> recent_cpu, 1);
+    //printf("INC Recent CPU");
+    //printf("N:%s P:%d R:%d\n", t->name, t->priority, F_TO_INT_NEAREST(F_MUL_INT(t->recent_cpu, 100)) );
+  }
+
+  
+  if ( thread_mlfqs && timer_ticks() % TIMER_FREQ == 0 ) {
+    void (*fp)(struct thread *, void *);
+    fp = thread_recalculate_recent_cpu;
+    //printf("N:%s P:%d R:%d\n", t->name, t->priority, F_TO_INT_NEAREST(F_MUL_INT(t->recent_cpu, 100)) );
+    load_avg = F_ADD(F_MUL(F_DIV_INT(F_TO_FIXED(59), 60), load_avg), F_MUL(F_DIV_INT(F_TO_FIXED(1), 60), (ready_ps.size + 1)));
+    thread_foreach ( fp, NULL );
+    //printf("N:%s P:%d R:%d\n", t->name, t->priority, F_TO_INT_NEAREST(F_MUL_INT(t->recent_cpu, 100)) );
+  }
+
+  if ( thread_mlfqs && thread_ticks % 4 == 0) {
+    void (*fp)(struct thread *, void *);
+    fp = thread_recalculate_priority;
+
+    thread_foreach ( thread_recalculate_priority, NULL );
+  }
+
   /* Enforce preemption. */
-  if (++thread_ticks >= TIME_SLICE)
+  if (thread_ticks >= TIME_SLICE)
     intr_yield_on_return ();
 }
 
@@ -170,7 +223,8 @@ tid_t
 thread_create (const char *name, int priority,
                thread_func *function, void *aux) 
 {
-  struct thread *t;
+  struct thread * t;
+  struct thread * th;
   struct kernel_thread_frame *kf;
   struct switch_entry_frame *ef;
   struct switch_threads_frame *sf;
@@ -192,6 +246,10 @@ thread_create (const char *name, int priority,
      Do this atomically so intermediate values for the 'stack' 
      member cannot be observed. */
   old_level = intr_disable ();
+
+  th = thread_current();
+
+
 
   /* Stack frame for kernel_thread(). */
   kf = alloc_frame (t, sizeof *kf);
@@ -353,7 +411,18 @@ thread_sleep (void)
   intr_set_level (old_level);
 }
 
+void 
+thread_recalculate_recent_cpu( struct thread * t, void * d  ){
+  t->recent_cpu = F_ADD_INT( F_MUL( F_DIV( F_MUL_INT( load_avg, 2 ), F_ADD_INT( F_MUL_INT( load_avg, 2 ), 1 ) ), t -> recent_cpu), t -> nice);
+}
 
+void 
+thread_recalculate_priority( struct thread * t, void * d  ){
+  t->priority = PRI_MAX - F_TO_INT_NEAREST( F_SUB_INT( F_DIV_INT( t -> recent_cpu, 4 ), t -> nice * 2 ) );
+  t->base_priority = t->priority;
+
+  ps_update_auto( t );
+}
 /* Invoke function 'func' on all threads, passing along 'aux'.
    This function must be called with interrupts off. */
 void
@@ -435,42 +504,36 @@ void
 thread_set_nice (int new_nice) 
 {
 
-  enum intr_level old_level = intr_disable ();
-  struct thread *t = thread_current ();
+
+  /* We want to make sure that we will change priority of the correct thread */
+  enum intr_level old_level;
+  old_level = intr_disable ();
+  struct thread *t;
+  t = thread_current ();
   t -> nice = new_nice;
-
-  struct thread *th = ps_pop (&ready_ps);
+  thread_set_priority ( PRI_MAX - F_TO_INT_NEAREST( F_SUB_INT( F_DIV_INT( t->recent_cpu, 4 ), new_nice * 2 ) ) );
   intr_set_level (old_level);
-
-  ps_push (&ready_ps, th);
-  
-  int new_priority = 0;
-
-  if ( th -> priority > new_priority )
-    thread_yield ();
 }
 
 /* Returns the current thread's nice value. */
 int
 thread_get_nice (void) 
 {
-  return thread_current () -> nice;
+  return thread_current ()->nice;
 }
 
 /* Returns 100 times the system load average. */
 int
 thread_get_load_avg (void) 
 {
-  /* Not yet implemented. */
-  return 0;
+  return F_TO_INT_NEAREST(F_MUL_INT(load_avg, 100));
 }
 
 /* Returns 100 times the current thread's recent_cpu value. */
 int
 thread_get_recent_cpu (void) 
 {
-  /* Not yet implemented. */
-  return 0;
+  return F_TO_INT_NEAREST(F_MUL_INT(thread_current ()->recent_cpu, 100));
 }
 
 /* Idle thread.  Executes when no other thread is ready to run.
@@ -560,8 +623,15 @@ init_thread (struct thread *t, const char *name, int priority)
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
   t->base_priority = priority;
+
+  if( thread_mlfqs && t != initial_thread ){
+    t->nice = thread_current ()->nice; /* Set nice to parent's value of nice */
+    t->recent_cpu = thread_current ()->recent_cpu;
+    t->priority = PRI_MAX - F_TO_INT_NEAREST( F_SUB_INT( F_DIV_INT( t->recent_cpu, 4 ), t->nice * 2 ) ); /* Calculate priority */
+    t->base_priority = t->priority; /* Priority donation element */
+  }
+
   t->is_donated = false;
-  t -> nice = 0;
   list_init (&t->held_locks);
   t->magic = THREAD_MAGIC;
 

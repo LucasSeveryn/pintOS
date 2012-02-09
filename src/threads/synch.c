@@ -222,7 +222,7 @@ lock_acquire (struct lock *lock)
   
   if(lock->holder != NULL) {
 	  t->blocked_on = lock;
-  	donate_priority(lock);
+  	if( !thread_mlfqs ) donate_priority(lock);
     
   }
   sema_down(&lock->semaphore);
@@ -266,9 +266,11 @@ lock_release (struct lock *lock)
 
   lock->holder = NULL;
   sema_up (&lock->semaphore);
-  int new_priority = recompute_priority(); 
-  thread_set_waiting_thread_priority (thread_current (), new_priority);
-
+  
+  if ( ! thread_mlfqs ){
+    int new_priority = recompute_priority(); 
+    thread_set_waiting_thread_priority (thread_current (), new_priority);
+  }
 }
 
 /* Returns true if the current thread holds LOCK, false

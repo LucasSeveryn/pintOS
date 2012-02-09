@@ -217,6 +217,7 @@ void
 list_push_back (struct list *list, struct list_elem *elem)
 {
   list_insert (list_end (list), elem);
+  //debug_backtrace();
 }
 
 /* Removes ELEM from its list and returns the element that
