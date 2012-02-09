@@ -112,17 +112,7 @@ thread_init (void)
   initial_thread -> recent_cpu = 0;
   
   if ( thread_mlfqs ) {
-    initial_thread -> priority = PRI_MAX - F_TO_INT_NEAREST( F_DIV_INT( initial_thread -> recent_cpu, 4 ) );
-    printf("%d\n", F_TO_INT_NEAREST( F_DIV_INT( initial_thread -> recent_cpu, 4 ) ));
-    printf("%d\n", F_TO_INT( F_TO_FIXED( 3 )));
-    printf("%d\n", F_TO_INT_NEAREST( F_TO_FIXED( 3 )));
-    printf("%d\n", F_TO_INT_NEAREST( F_MUL( F_TO_FIXED( 3 ), F_TO_FIXED( 3 ))));
-    printf("%d\n", F_TO_INT_NEAREST( F_ADD( F_TO_FIXED( 3 ), F_TO_FIXED( 3 ))));
-    printf("%d\n", F_TO_INT_NEAREST( F_SUB( F_TO_FIXED( 3 ), F_TO_FIXED( 3 ))));
-    printf("%d\n", F_TO_INT_NEAREST( F_DIV( F_TO_FIXED( 3 ), F_TO_FIXED( 3 ))));
-    printf("%d\n", F_TO_INT_NEAREST( F_MUL_INT( F_TO_FIXED( 3 ),  3 )));
-    printf("%d\n", F_TO_INT_NEAREST( F_ADD_INT( F_TO_FIXED( 3 ),  3 )));
-    //ps_update_auto( initial_thread );
+    thread_recalculate_priority( initial_thread, NULL);
   }
 
   initial_thread->status = THREAD_RUNNING;
@@ -170,25 +160,23 @@ thread_tick (void)
 
   if (t != idle_thread){
     t -> recent_cpu = F_ADD_INT(t -> recent_cpu, 1);
-    //printf("INC Recent CPU");
-    //printf("N:%s P:%d R:%d\n", t->name, t->priority, F_TO_INT_NEAREST(F_MUL_INT(t->recent_cpu, 100)) );
   }
 
   
   if ( thread_mlfqs && timer_ticks() % TIMER_FREQ == 0 ) {
     void (*fp)(struct thread *, void *);
     fp = thread_recalculate_recent_cpu;
-    //printf("N:%s P:%d R:%d\n", t->name, t->priority, F_TO_INT_NEAREST(F_MUL_INT(t->recent_cpu, 100)) );
+
     load_avg = F_ADD(F_MUL(F_DIV_INT(F_TO_FIXED(59), 60), load_avg), F_MUL(F_DIV_INT(F_TO_FIXED(1), 60), (ready_ps.size + 1)));
     thread_foreach ( fp, NULL );
-    //printf("N:%s P:%d R:%d\n", t->name, t->priority, F_TO_INT_NEAREST(F_MUL_INT(t->recent_cpu, 100)) );
+
   }
 
   if ( thread_mlfqs && thread_ticks % 4 == 0) {
     void (*fp)(struct thread *, void *);
     fp = thread_recalculate_priority;
 
-    thread_foreach ( thread_recalculate_priority, NULL );
+    thread_foreach ( fp, NULL );
   }
 
   /* Enforce preemption. */
@@ -403,7 +391,6 @@ thread_sleep (void)
 
   old_level = intr_disable ();
   if (cur != idle_thread){
-    //list_push_back (&ready_list, &cur->elem);
     ps_push( &ready_ps, cur );
   }
   cur->status = THREAD_SLEEPING;
@@ -412,13 +399,15 @@ thread_sleep (void)
 }
 
 void 
-thread_recalculate_recent_cpu( struct thread * t, void * d  ){
+thread_recalculate_recent_cpu( struct thread * t, void * d UNUSED ){
   t->recent_cpu = F_ADD_INT( F_MUL( F_DIV( F_MUL_INT( load_avg, 2 ), F_ADD_INT( F_MUL_INT( load_avg, 2 ), 1 ) ), t -> recent_cpu), t -> nice);
 }
 
 void 
-thread_recalculate_priority( struct thread * t, void * d  ){
-  t->priority = PRI_MAX - F_TO_INT_NEAREST( F_SUB_INT( F_DIV_INT( t -> recent_cpu, 4 ), t -> nice * 2 ) );
+thread_recalculate_priority( struct thread * t, void * d UNUSED ){
+  t->priority = PRI_MAX - F_TO_INT( F_SUB_INT( F_DIV_INT( t -> recent_cpu, 4 ), t -> nice * 2 ) );
+  if(t->priority<PRI_MIN) t->priority = PRI_MIN;
+  if(t->priority>PRI_MAX) t->priority = PRI_MAX;
   t->base_priority = t->priority;
 
   ps_update_auto( t );
@@ -475,7 +464,7 @@ void
 thread_set_priority (int new_priority) 
 {
   enum intr_level old_level;
-  struct thread *th;
+  struct thread *th = NULL;
   old_level = intr_disable ();
 
   struct thread *t = thread_current ();
@@ -511,7 +500,8 @@ thread_set_nice (int new_nice)
   struct thread *t;
   t = thread_current ();
   t -> nice = new_nice;
-  thread_set_priority ( PRI_MAX - F_TO_INT_NEAREST( F_SUB_INT( F_DIV_INT( t->recent_cpu, 4 ), new_nice * 2 ) ) );
+  thread_recalculate_priority( t, NULL);
+  thread_set_priority( t -> priority );
   intr_set_level (old_level);
 }
 
@@ -627,8 +617,7 @@ init_thread (struct thread *t, const char *name, int priority)
   if( thread_mlfqs && t != initial_thread ){
     t->nice = thread_current ()->nice; /* Set nice to parent's value of nice */
     t->recent_cpu = thread_current ()->recent_cpu;
-    t->priority = PRI_MAX - F_TO_INT_NEAREST( F_SUB_INT( F_DIV_INT( t->recent_cpu, 4 ), t->nice * 2 ) ); /* Calculate priority */
-    t->base_priority = t->priority; /* Priority donation element */
+    thread_recalculate_priority (t, NULL);
   }
 
   t->is_donated = false;
@@ -661,7 +650,7 @@ alloc_frame (struct thread *t, size_t size)
 static struct thread *
 next_thread_to_run (void) 
 {
-  struct thread *th;
+  struct thread *th = NULL;
   if ( ps_empty (&ready_ps) )
     return idle_thread;
   else {
