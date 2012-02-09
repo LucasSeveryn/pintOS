@@ -5,6 +5,8 @@
 #include <list.h>
 #include <stdint.h>
 
+#include "threads/fixed-point.h"
+
 /* States in a thread's life cycle. */
 enum thread_status
   {
@@ -81,6 +83,7 @@ typedef int tid_t;
    only because they are mutually exclusive: only a thread in the
    ready state is on the run queue, whereas only a thread in the
    blocked state is on a semaphore wait list. */
+
 struct thread
   {
     /* Owned by thread.c. */
@@ -92,8 +95,9 @@ struct thread
     struct list_elem allelem;           /* List element for all threads list. */
     struct priority_scheduler * pss;    /* Pointer to a queue it belongs to */
     int64_t time_to_wake;               /* Absolute time after which thread will wake up. */
+    FIXED recent_cpu;                   /* 4.4BSD SCH - recent cpu */
 
-	    int nice;                 /* 4.4BSD SCH - nice value */
+	  int nice;                 /* 4.4BSD SCH - nice value */
 	  int base_priority;					        /* priority set through set_priority */
     bool is_donated;                    /* whether current priority is donated */
 
