@@ -163,17 +163,15 @@ thread_tick (void)
   }
 
 
-  if (thread_mlfqs) {
-    struct list_elem *e;
-    for (e = list_begin (&ready_ps.sleeping_list); e != list_end (&ready_ps.sleeping_list);
-       e = list_next (e))
-    {
-      bool woken_up = false;
-      struct thread *t = list_entry (e, struct thread, elem);
-      woken_up = thread_wakeup( t, NULL);
-      if( ! woken_up ){
-        break;
-      }
+  struct list_elem *e;
+  for (e = list_begin (&ready_ps.sleeping_list); e != list_end (&ready_ps.sleeping_list);
+     e = list_next (e))
+  {
+    bool woken_up = false;
+    struct thread *t = list_entry (e, struct thread, elem);
+    woken_up = thread_wakeup( t, NULL);
+    if( ! woken_up ){
+      break;
     }
   }
   
