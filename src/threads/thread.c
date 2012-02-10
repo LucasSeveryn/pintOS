@@ -164,10 +164,10 @@ thread_tick (void)
 
 
   struct list_elem *e;
-  bool woken_up = false;
   for (e = list_begin (&ready_ps.sleeping_list); e != list_end (&ready_ps.sleeping_list);
      e = list_next (e))
   {
+    bool woken_up = true;
     struct thread *thread_to_wake = list_entry (e, struct thread, elem);
     woken_up = thread_wakeup( thread_to_wake, NULL);
     if( ! woken_up ){
@@ -175,7 +175,21 @@ thread_tick (void)
     }
   }
 
-  if( e != list_begin(&ready_ps.sleeping_list)) 
+  if (e != list_begin (&ready_ps.sleeping_list))
+  {
+    struct list_elem *woken_elem;
+    e = list_prev (e);
+    while(woken_elem != e)
+    {
+      woken_elem = list_pop_front (&ready_ps.sleeping_list);
+      ps_push( &ready_ps, list_entry (woken_elem, struct thread, elem));
+    }
+  }
+ /*     ps_push (&ready_ps, thread_to_wake );
+
+  if( e != list_begin (&ready_ps.sleeping_list) && !woken_up )
+    ps_insert_sleeping(&ready_ps, list_entry (e, struct thread, elem));
+  /*if( e != list_begin(&ready_ps.sleeping_list)) 
   {
     e = list_prev (e);
     struct list_elem *woken_up_elem;
@@ -185,7 +199,7 @@ thread_tick (void)
       struct thread *woken_thread = list_entry (woken_up_elem, struct thread, elem);
       ps_push (&ready_ps, woken_thread );
     }
-  }
+  }*/
   
   if (thread_mlfqs && timer_ticks() % TIMER_FREQ == 0) {
     thread_foreach (thread_recalculate_recent_cpu, NULL);
