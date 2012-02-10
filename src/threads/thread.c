@@ -164,14 +164,26 @@ thread_tick (void)
 
 
   struct list_elem *e;
+  bool woken_up = false;
   for (e = list_begin (&ready_ps.sleeping_list); e != list_end (&ready_ps.sleeping_list);
      e = list_next (e))
   {
-    bool woken_up = false;
-    struct thread *t = list_entry (e, struct thread, elem);
-    woken_up = thread_wakeup( t, NULL);
+    struct thread *thread_to_wake = list_entry (e, struct thread, elem);
+    woken_up = thread_wakeup( thread_to_wake, NULL);
     if( ! woken_up ){
       break;
+    }
+  }
+
+  if( e != list_begin(&ready_ps.sleeping_list)) 
+  {
+    e = list_prev (e);
+    struct list_elem *woken_up_elem;
+    while( woken_up_elem != e || !list_empty (&ready_ps.sleeping_list)) 
+    {
+      woken_up_elem = list_pop_front (&ready_ps.sleeping_list);
+      struct thread *woken_thread = list_entry (woken_up_elem, struct thread, elem);
+      ps_push (&ready_ps, woken_thread );
     }
   }
   
@@ -394,9 +406,8 @@ thread_sleep (void)
   cur->status = THREAD_SLEEPING;
   if (cur != idle_thread){
     ps_insert_sleeping( &ready_ps, cur );
+    ready_ps.sleeping++;
   }
-  ready_ps.sleeping++;
-
   schedule ();
   intr_set_level (old_level);
 }
@@ -411,9 +422,6 @@ thread_wakeup( struct thread *t, void *d UNUSED ) {
   if( t->status == THREAD_SLEEPING && t->time_to_wake <= timer_ticks() ) {
     t->status = THREAD_READY;
     t->pss->sleeping--;
-
-    list_remove (&t->elem);
-    ps_push (&ready_ps, t );
     return true;
   }
   return false;
