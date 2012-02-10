@@ -162,7 +162,7 @@ thread_tick (void)
     t->recent_cpu = F_ADD_INT(t->recent_cpu, 1);
   }
 
-
+  /* Checks whether there are any threads that needs to be woken up */
   struct list_elem *e;
   for (e = list_begin (&ready_ps.sleeping_list); e != list_end (&ready_ps.sleeping_list);
      e = list_next (e))
@@ -175,6 +175,7 @@ thread_tick (void)
     }
   }
 
+  /* Actually moves threads from sleeping queue to ready queue */
   if (e != list_begin (&ready_ps.sleeping_list))
   {
     struct list_elem *woken_elem;
@@ -185,28 +186,20 @@ thread_tick (void)
       ps_push( &ready_ps, list_entry (woken_elem, struct thread, elem));
     }
   }
- /*     ps_push (&ready_ps, thread_to_wake );
 
-  if( e != list_begin (&ready_ps.sleeping_list) && !woken_up )
-    ps_insert_sleeping(&ready_ps, list_entry (e, struct thread, elem));
-  /*if( e != list_begin(&ready_ps.sleeping_list)) 
-  {
-    e = list_prev (e);
-    struct list_elem *woken_up_elem;
-    while( woken_up_elem != e || !list_empty (&ready_ps.sleeping_list)) 
-    {
-      woken_up_elem = list_pop_front (&ready_ps.sleeping_list);
-      struct thread *woken_thread = list_entry (woken_up_elem, struct thread, elem);
-      ps_push (&ready_ps, woken_thread );
-    }
-  }*/
-  
+  /* Recalculates priority for each thread and calculates load_avg */  
   if (thread_mlfqs && timer_ticks() % TIMER_FREQ == 0) {
-    thread_foreach (thread_recalculate_recent_cpu, NULL);
+    thread_foreach (&thread_recalculate_recent_cpu, NULL);
     load_avg = F_ADD(F_MUL(F_DIV_INT(F_TO_FIXED(59), 60), load_avg), F_MUL_INT(F_DIV_INT(F_TO_FIXED(1), 60), (ready_ps.size + (thread_current() != idle_thread))));
   }
 
-  if ( thread_mlfqs && timer_ticks() % 4 == 3) {
+  /* Recomputes priority for each thread 
+   Even though its not necessary some edge cases require it.
+   These might not be common, however, we prefer to comply
+   with the specification and always schedule thread with
+   highest actual priority
+  */
+  if ( thread_mlfqs && timer_ticks() % 4 == 0) {
     thread_foreach (&thread_recalculate_priority, NULL);
   }
 
@@ -701,19 +694,6 @@ next_thread_to_run (void)
     return idle_thread;
   else {
     th = ps_pop (&ready_ps);
-
-	if ( th->status == THREAD_SLEEPING ) {
-		if ( th->time_to_wake > timer_ticks () ) {
-			struct thread *th2 = next_thread_to_run ();
-			ps_push ( &ready_ps, th );
-			return th2;
-		} else {
-			th->status = THREAD_READY;
-      ready_ps.sleeping--;
-
-      list_remove (&th->elem);
-		}
-	}
     return th;
   }
 }
