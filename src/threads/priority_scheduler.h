@@ -6,6 +6,7 @@
 
 struct priority_scheduler{
 	struct list lists[PRI_MAX + 1];		/* 64 queues of threads */
+	struct list sleeping_list;			/* Ordered list with sleeping threads */
 	int max_priority;					/* Highest priority of a thread in the scheduler */
 	int size;							/* Number of threads currently inside */
 	int sleeping;						/* Number of sleeping threads in it */
@@ -17,10 +18,13 @@ void ps_init( struct priority_scheduler * );
 
 /* Priority Queue insertion */
 void ps_push( struct priority_scheduler *, struct thread * );
+void ps_insert_sleeping ( struct priority_scheduler *, struct thread * );
 
 /* Highest priority */ 
 struct thread * ps_pop( struct priority_scheduler * );
 struct thread * ps_pull( struct priority_scheduler * );
+
+
 
 bool ps_contains( struct priority_scheduler *, struct thread * );
 

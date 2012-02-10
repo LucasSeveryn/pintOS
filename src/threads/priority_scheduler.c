@@ -2,6 +2,8 @@
 #include "threads/interrupt.h"
 #include <stdio.h>
 
+bool ps_sleeping_order (const struct list_elem *, const struct list_elem *, void *);
+
 /* Initializes a scheduler */
 void 
 ps_init (struct priority_scheduler * ps){
@@ -13,6 +15,8 @@ ps_init (struct priority_scheduler * ps){
 	for( i = PRI_MAX; i >=  0; i-- ){
 		list_init (&ps->lists[i]);
 	}
+
+	list_init (&ps->sleeping_list);
 }
 
 bool 
@@ -32,6 +36,24 @@ ps_push (struct priority_scheduler * ps, struct thread * th){
 	}
 
 	th->pss = ps;
+}
+
+
+bool 
+ps_sleeping_order  (const struct list_elem *a, const struct list_elem *b, void *aux)
+{
+  struct thread *tha = list_entry(a, struct thread, elem);
+  struct thread *thb = list_entry(b, struct thread, elem);
+  return tha->time_to_wake < thb->time_to_wake;
+}
+
+void
+ps_insert_sleeping ( struct priority_scheduler * ps, struct thread * th ){
+	ASSERT( th->status == THREAD_SLEEPING );
+
+	th -> pss = ps;
+	list_insert_ordered( &ps->sleeping_list, &th -> elem, ps_sleeping_order , NULL );
+
 }
 
 /* Returns and removes thread with the highest priority */
@@ -107,7 +129,8 @@ ps_update_auto ( struct thread * th){
 void 
 ps_update (struct priority_scheduler * ps, struct thread * th){
 	ASSERT( th->status == THREAD_READY );
-		
+	ASSERT( ps_contains (ps, th) );
+
 	list_remove (&th->elem);
 	ps->size--;
 	ps_push (ps, th);

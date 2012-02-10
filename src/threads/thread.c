@@ -75,7 +75,7 @@ static void *alloc_frame (struct thread *, size_t size);
 static void schedule (void);
 void thread_schedule_tail (struct thread *prev);
 void thread_recalculate_recent_cpu( struct thread * , void * );
-void thread_wakeup( struct thread *, void * );
+bool thread_wakeup( struct thread *, void * );
 void thread_recalculate_priority( struct thread * , void * );
 static tid_t allocate_tid (void);
 
@@ -144,7 +144,7 @@ void
 thread_tick (void) 
 {
   struct thread *t = thread_current ();
-  struct thread *th;
+  struct thread *th = NULL;
   /* Update statistics. */
   if (t == idle_thread)
     idle_ticks++;
@@ -164,16 +164,26 @@ thread_tick (void)
 
 
   if (thread_mlfqs) {
-    thread_foreach( &thread_wakeup, NULL );
+    struct list_elem *e;
+    for (e = list_begin (&ready_ps.sleeping_list); e != list_end (&ready_ps.sleeping_list);
+       e = list_next (e))
+    {
+      bool woken_up = false;
+      struct thread *t = list_entry (e, struct thread, elem);
+      woken_up = thread_wakeup( t, NULL);
+      if( ! woken_up ){
+        break;
+      }
+    }
   }
   
   if (thread_mlfqs && timer_ticks() % TIMER_FREQ == 0) {
-    thread_foreach (&thread_recalculate_recent_cpu, NULL);
-    load_avg = F_ADD(F_MUL(F_DIV_INT(F_TO_FIXED(59), 60), load_avg), F_MUL_INT(F_DIV_INT(F_TO_FIXED(1), 60), (ready_ps.size - ready_ps.sleeping + (thread_current() != idle_thread))));
+    thread_foreach (thread_recalculate_recent_cpu, NULL);
+    load_avg = F_ADD(F_MUL(F_DIV_INT(F_TO_FIXED(59), 60), load_avg), F_MUL_INT(F_DIV_INT(F_TO_FIXED(1), 60), (ready_ps.size + (thread_current() != idle_thread))));
   }
 
   if ( thread_mlfqs && timer_ticks() % 4 == 0) {
-    thread_foreach (&thread_recalculate_priority, NULL);
+    thread_foreach (thread_recalculate_priority, NULL);
   }
 
   if (!ps_empty (&ready_ps))
@@ -383,11 +393,12 @@ thread_sleep (void)
   ASSERT (!intr_context ());
 
   old_level = intr_disable ();
-  if (cur != idle_thread){
-    ps_push( &ready_ps, cur );
-  }
   cur->status = THREAD_SLEEPING;
+  if (cur != idle_thread){
+    ps_insert_sleeping( &ready_ps, cur );
+  }
   ready_ps.sleeping++;
+
   schedule ();
   intr_set_level (old_level);
 }
@@ -397,24 +408,31 @@ thread_recalculate_recent_cpu( struct thread * t, void * d UNUSED ){
     t->recent_cpu = F_ADD_INT( F_MUL( F_DIV( F_MUL_INT( load_avg, 2 ), F_ADD_INT( F_MUL_INT( load_avg, 2 ), 1 ) ), t -> recent_cpu), t -> nice);
 }
 
-void
+bool
 thread_wakeup( struct thread *t, void *d UNUSED ) {
   if( t->status == THREAD_SLEEPING && t->time_to_wake <= timer_ticks() ) {
     t->status = THREAD_READY;
     t->pss->sleeping--;
+
+    list_remove (&t->elem);
+    ps_push (&ready_ps, t );
+    return true;
   }
+  return false;
 }
 
 void 
 thread_recalculate_priority( struct thread * t, void * d UNUSED ){
   if( t->status != THREAD_SLEEPING ) {
+    int old_priority = t->priority;
     t->priority = PRI_MAX - F_TO_INT( F_ADD_INT( F_DIV_INT( t -> recent_cpu, 4 ), t -> nice * 2 ) );
     if(t->priority<PRI_MIN) t->priority = PRI_MIN;
     if(t->priority>PRI_MAX) t->priority = PRI_MAX;
     t->base_priority = t->priority;
     
     /* Update position in the queue */
-    ps_update_auto( t );
+    if( old_priority != t->priority )
+      ps_update_auto( t );
   }
 }
 
@@ -672,6 +690,8 @@ next_thread_to_run (void)
 		} else {
 			th->status = THREAD_READY;
       ready_ps.sleeping--;
+
+      list_remove (&th->elem);
 		}
 	}
     return th;
