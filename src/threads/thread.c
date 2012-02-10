@@ -182,8 +182,8 @@ thread_tick (void)
     load_avg = F_ADD(F_MUL(F_DIV_INT(F_TO_FIXED(59), 60), load_avg), F_MUL_INT(F_DIV_INT(F_TO_FIXED(1), 60), (ready_ps.size + (thread_current() != idle_thread))));
   }
 
-  if ( thread_mlfqs && timer_ticks() % 4 == 0) {
-    thread_foreach (thread_recalculate_priority, NULL);
+  if ( thread_mlfqs && timer_ticks() % 4 == 3) {
+    thread_foreach (&thread_recalculate_priority, NULL);
   }
 
   if (!ps_empty (&ready_ps))
