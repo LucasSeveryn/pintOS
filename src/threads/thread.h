@@ -97,7 +97,7 @@ struct thread
     int64_t time_to_wake;               /* Absolute time after which thread will wake up. */
     FIXED recent_cpu;                   /* 4.4BSD SCH - recent cpu */
 
-	  int nice;                 /* 4.4BSD SCH - nice value */
+	  int nice;                            /* 4.4BSD SCH - nice value */
 	  int base_priority;					        /* priority set through set_priority */
     bool is_donated;                    /* whether current priority is donated */
 

@@ -5,10 +5,10 @@
 #include "lib/kernel/list.h"
 
 struct priority_scheduler{
-	struct list lists[PRI_MAX + 1];
-	int max_priority;
-	int size;
-	int sleeping;
+	struct list lists[PRI_MAX + 1];		/* 64 queues of threads */
+	int max_priority;					/* Highest priority of a thread in the scheduler */
+	int size;							/* Number of threads currently inside */
+	int sleeping;						/* Number of sleeping threads in it */
 };
 
 bool ps_empty( struct priority_scheduler * );

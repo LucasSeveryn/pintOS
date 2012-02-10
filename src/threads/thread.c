@@ -109,19 +109,16 @@ thread_init (void)
 
   init_thread (initial_thread, "main", PRI_DEFAULT);
   
-  initial_thread -> nice = 0;
-  initial_thread -> recent_cpu = 0;
+  initial_thread->nice = 0;
+  initial_thread->recent_cpu = 0;
   
-  if ( thread_mlfqs ) {
-    thread_recalculate_priority( initial_thread, NULL);
-    //int x = F_TO_INT_NEAREST(F_MUL_INT(F_DIV_INT(F_TO_FIXED(1), 60), 100));
-    //printf("%d\n", x);
+  if (thread_mlfqs) {
+    thread_recalculate_priority (initial_thread, NULL);
+
   }
 
   initial_thread->status = THREAD_RUNNING;
   initial_thread->tid = allocate_tid ();
-
-  //printf("ITP:%d\n", initial_thread -> priority);
 }
 
 /* Starts preemptive thread scheduling by enabling interrupts.
@@ -162,22 +159,21 @@ thread_tick (void)
   thread_ticks++;
 
   if (t != idle_thread){
-    t -> recent_cpu = F_ADD_INT(t -> recent_cpu, 1);
+    t->recent_cpu = F_ADD_INT(t->recent_cpu, 1);
   }
 
 
-  if ( thread_mlfqs ) {
+  if (thread_mlfqs) {
     thread_foreach( &thread_wakeup, NULL );
   }
   
-  if ( thread_mlfqs && timer_ticks() % TIMER_FREQ == 0 ) {
-    thread_foreach ( &thread_recalculate_recent_cpu, NULL );
+  if (thread_mlfqs && timer_ticks() % TIMER_FREQ == 0) {
+    thread_foreach (&thread_recalculate_recent_cpu, NULL);
     load_avg = F_ADD(F_MUL(F_DIV_INT(F_TO_FIXED(59), 60), load_avg), F_MUL_INT(F_DIV_INT(F_TO_FIXED(1), 60), (ready_ps.size - ready_ps.sleeping + (thread_current() != idle_thread))));
-    //printf("L:%d R:%d Ready:%d ps.size:%d ps.sleeping:%d\n", thread_get_load_avg(), thread_get_recent_cpu(), ready_ps.size - ready_ps.sleeping + (thread_current() != idle_thread), ready_ps.size, ready_ps.sleeping);
   }
 
   if ( thread_mlfqs && timer_ticks() % 4 == 0) {
-    thread_foreach ( thread_recalculate_priority, NULL );
+    thread_foreach (&thread_recalculate_priority, NULL);
   }
 
   if (!ps_empty (&ready_ps))
@@ -297,8 +293,7 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-  //list_push_back (&ready_list, &t->elem);
-  ps_push( &ready_ps, t );
+  ps_push (&ready_ps, t);
   t->status = THREAD_READY;
   intr_set_level (old_level);
 }
@@ -370,7 +365,6 @@ thread_yield (void)
 
   old_level = intr_disable ();
   if (cur != idle_thread){
-    //list_push_back (&ready_list, &cur->elem);
     ps_push( &ready_ps, cur );
   }
   cur->status = THREAD_READY;
