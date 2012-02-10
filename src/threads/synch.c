@@ -222,11 +222,11 @@ lock_acquire (struct lock *lock)
   
   if(lock->holder != NULL) {
 	  t->blocked_on = lock;
-  	if( !thread_mlfqs ) donate_priority(lock);
-    
+  	if( !thread_mlfqs ) 
+      donate_priority(lock);
   }
   sema_down(&lock->semaphore);
-  list_push_front(&t->held_locks, &lock->lock_elem); //change to insert in order
+  list_push_front(&t->held_locks, &lock->lock_elem);
   lock->holder = t;
 }
 
@@ -306,7 +306,10 @@ donate_priority (const struct lock *lock)
   }
 }
 
-/* Recomputes new priority of a thread after it has released a lock. */
+/* Recomputes new priority of a thread after it has released a lock. 
+   Thread may hold many locks, the function will iterate over lists 
+   of threads wainting for these locks, an d return the priority of 
+   the highest priority thread from the waiting threads*/
 int
 recompute_priority () 
 {
