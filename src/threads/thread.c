@@ -171,6 +171,17 @@ thread_tick (void)
     struct thread *t = list_entry (e, struct thread, elem);
     woken_up = thread_wakeup( t, NULL);
     if( ! woken_up ){
+      struct list_elem *woken_up_elem;
+      
+      for (woken_up_elem = list_begin (&ready_ps.sleeping_list); woken_up_elem != e;
+     woken_up_elem = list_next (woken_up_elem))
+      {
+       struct thread *woken_thread = list_entry (woken_up_elem, struct thread, elem);
+       list_remove (&woken_thread->elem);
+       th->pss = NULL;
+       
+       ps_push (&ready_ps, woken_thread );
+      }
       break;
     }
   }
@@ -412,8 +423,6 @@ thread_wakeup( struct thread *t, void *d UNUSED ) {
     t->status = THREAD_READY;
     t->pss->sleeping--;
 
-    list_remove (&t->elem);
-    ps_push (&ready_ps, t );
     return true;
   }
   return false;
@@ -680,18 +689,6 @@ next_thread_to_run (void)
   else {
     th = ps_pop (&ready_ps);
 
-	if ( th->status == THREAD_SLEEPING ) {
-		if ( th->time_to_wake > timer_ticks () ) {
-			struct thread *th2 = next_thread_to_run ();
-			ps_push ( &ready_ps, th );
-			return th2;
-		} else {
-			th->status = THREAD_READY;
-      ready_ps.sleeping--;
-
-      list_remove (&th->elem);
-		}
-	}
     return th;
   }
 }
