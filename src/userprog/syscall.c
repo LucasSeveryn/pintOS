@@ -59,6 +59,7 @@ syscall_init (void)
   syscall_noa[SYS_EXEC] = 1;
   syscall_noa[SYS_WAIT] = 1;
   syscall_noa[SYS_WRITE] = 3;
+
 }
 
 static void
@@ -123,15 +124,3 @@ syscall_write( char * args, struct intr_frame *f ){
     putbuf(buffer, size);
   }
 }
-/*
-static void *
-syscall_retrieve_args(struct intr_frame *f){
-	void * args = new (void*)[3];
-	
-	return args;
-} 
-
-static int 
-exit( void * args ){
-	
-}*/
