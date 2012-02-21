@@ -14,7 +14,8 @@ static int
 get_user (const uint8_t *uaddr)
 {
 	int result;
-	if (!((void *) uaddr < PHYS_BASE)) 
+	if (!((void *) uaddr < PHYS_BASE))
+	{
 		printf ("Trying to access memory address: %p, which is kernel memory address\n", uaddr);
 		return -1;
 	}
@@ -29,7 +30,8 @@ static bool
 put_user (uint8_t *udst, uint8_t byte)
 {
 	int error_code;
-	if (!((void *) uaddr < PHYS_BASE)) 
+	if (!((void *) udst < PHYS_BASE)) 
+	{
 		printf ("Trying to write to memory address: %p, value %u.\n",
 				 udst, byte);
 		return false;
