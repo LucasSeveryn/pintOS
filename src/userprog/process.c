@@ -170,6 +170,10 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
+  struct semaphore * child_alive;
+  sema_init(child_alive, 0);
+  sema_down(child_alive);
+
   return -1;
 }
 
@@ -213,7 +217,7 @@ process_activate (void)
      interrupts. */
   tss_update ();
 }
-
+
 /* We load ELF binaries.  The following definitions are taken
    from the ELF specification, [ELF1], more-or-less verbatim.  */
 

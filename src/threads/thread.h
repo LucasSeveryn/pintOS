@@ -101,12 +101,16 @@ struct thread
 	  int base_priority;					        /* priority set through set_priority */
     bool is_donated;                    /* whether current priority is donated */
 
-  	struct list held_locks;			      	/* locks held by thread */
+    struct list held_locks;			      	/* locks held by thread */
   	struct lock *blocked_on;			      /* lock on which current thread is waiting */
     struct semaphore *waiting_on;        /* semaphore on which our thread is waiting */
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
+
+    struct thread * parent;             /* parent of the thread */
+    struct list_elem child;             
+    struct list children;               /* children of the thread */
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
