@@ -92,7 +92,6 @@ syscall_init (void)
   syscall_noa[SYS_SEEK] = 2;
   syscall_noa[SYS_TELL] = 1;
   syscall_noa[SYS_CLOSE] = 1;
-    
 }
 
 static void
