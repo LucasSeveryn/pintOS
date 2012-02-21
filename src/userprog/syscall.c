@@ -59,7 +59,6 @@ syscall_init (void)
   syscall_noa[SYS_EXEC] = 1;
   syscall_noa[SYS_WAIT] = 1;
   syscall_noa[SYS_WRITE] = 3;
-
 }
 
 static void
