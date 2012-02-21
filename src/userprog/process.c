@@ -17,6 +17,8 @@
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "threads/malloc.h"
+
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
@@ -54,18 +56,44 @@ start_process (void *file_name_)
   struct intr_frame if_;
   bool success;
 
+  /* ----- */
+
+  char *rest; 
+  char *token; 
+  printf("Length of file_name: %d\n", strlen(file_name));
+  char *s = (char *)malloc (strlen (file_name) + 1);   // Allocate memory
+  if (s != NULL)
+    strlcpy (s,file_name,strlen(file_name) + 1);                    // Copy string if okay
+  
+
+
+  /* Token gains the filename value */
+  char * file_name_token = strtok_r(s, " ", &rest);
+  
+  /* Array reserved for arguments */
+  printf("Length of s: %d\nLength of first token: %d\n", strlen(file_name), strlen(file_name_token));
+  char **args = (char **)malloc((strlen(file_name) - strlen(file_name_token))*sizeof(char));
+  char **cur_args = args;
+
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
-  success = load (file_name, &if_.eip, &if_.esp);
+  success = load (file_name_token, &if_.eip, &if_.esp);
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
   if (!success) 
     thread_exit ();
 
+  /* Tokenising rest of arguments */
+  int argc=0;
+
+  while((token = strtok_r(NULL, " ", &rest))) { 
+    *++cur_args = token;
+    argc++;
+  }
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
      threads/intr-stubs.S).  Because intr_exit takes all of its
