@@ -4,6 +4,9 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include <kernel/stdio.h>
+
+void (*)(char* , struct intr_frame *) syscall_functions[NOA];
 
 static void syscall_handler (struct intr_frame *);
 
@@ -47,6 +50,15 @@ syscall_init (void)
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
   syscall_functions[SYS_HALT] = &syscall_halt;
   syscall_functions[SYS_EXIT] = &syscall_exit;
+  syscall_functions[SYS_EXEC] = &syscall_exec;
+  syscall_functions[SYS_WAIT] = &syscall_wait;
+  syscall_functions[SYS_WRITE] = &syscall_write;
+
+  syscall_noa[SYS_HALT] = 0;
+  syscall_noa[SYS_EXIT] = 1;
+  syscall_noa[SYS_EXEC] = 1;
+  syscall_noa[SYS_WAIT] = 1;
+  syscall_noa[SYS_WRITE] = 3;
 }
 
 static void
@@ -55,11 +67,11 @@ syscall_handler (struct intr_frame *f)
   int syscall_number = *(f -> esp - 4);
   char * args = syscall_retrieve_args(f);
   int noa = (int) args[0];
-  syscall_functions[syscall_number]( args );
+  f->eax = syscall_functions[syscall_number]( args, f );
 }
 
 static char *
-syscall_retrieve_args(struct intr_frame *f){
+syscall_retrieve_args(struct intr_frame *f, struct intr_frame *f){
   char * args = new (char*)[3];
   int noa = syscall_noa[ *(f -> esp - 4) ];
 
@@ -70,20 +82,46 @@ syscall_retrieve_args(struct intr_frame *f){
   return args;
 } 
 
-static int 
-syscall_halt( char * args ){
+static void 
+syscall_halt(char * args, struct intr_frame *f){
   shutdown_power_off();
 }
 
-static int 
-syscall_exit( char * args ){
+static void 
+syscall_exit(char * args, struct intr_frame *f){
+  f->eax = args[1];
+  thread_current() -> ret = args[1];
   thread_exit();
-  return args[1];
 }
 
-static int 
-syscall_exec( char * args ){
-  tid_t id = process_execute( args );
+static void 
+syscall_exec(char * args, struct intr_frame *f){
+  struct thread * parent = thread_current();
+  tid_t id = process_execute (args);
+  if(id!=-1)thread_add_child (parent, id);
+  f->eax = id;
+}
+
+static void 
+syscall_wait( char * args, struct intr_frame *f ){
+  f->eax = process_wait( args[1] );
+}
+
+static void 
+syscall_write( char * args, struct intr_frame *f ){
+  if(args[1] == 1){
+    uint8_t buffer_addr = args[2];
+    size_t size = args[3];
+    char * buffer = (char *)malloc(size +1);
+
+    int i;
+    for(i = 0; i < size; i++){
+      char byte = get_user(buffer_addr+i);
+      buffer[i] = byte;
+    }
+
+    putbuf(buffer, size);
+  }
 }
 /*
 static void *
