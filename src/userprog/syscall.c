@@ -101,8 +101,7 @@ syscall_handler (struct intr_frame *f)
   int syscall_number = *(f -> esp - 4);
   char * args = syscall_retrieve_args (f);
   int noa = (int) args[0];
-  f->eax = syscall_functions[syscall_number]( args, f );
-  syscall_functions[syscall_number]( args );
+  syscall_functions[syscall_number]( args, f );
 }
 
 static void
