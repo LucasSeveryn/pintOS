@@ -4,6 +4,7 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
+#include "filesys/file.h"
 
 #include "threads/fixed-point.h"
 
@@ -108,13 +109,19 @@ struct thread
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
 
+#ifdef USERPROG
+    /* Owned by userprog/process.c. */
+    uint32_t *pagedir;                  /* Page directory. */
+
+    int ret;
+
+    struct semaphore * wait; 
+
     struct thread * parent;             /* parent of the thread */
     struct list_elem child;             
     struct list children;               /* children of the thread */
 
-#ifdef USERPROG
-    /* Owned by userprog/process.c. */
-    uint32_t *pagedir;                  /* Page directory. */
+    inode * files[64];
 #endif
 
     /* Owned by thread.c. */
@@ -158,5 +165,7 @@ int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
+
+struct thread* get_thread_by_tid(tid_t);
 
 #endif /* threads/thread.h */

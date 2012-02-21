@@ -170,11 +170,29 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
-  struct semaphore * child_alive;
-  sema_init(child_alive, 0);
-  sema_down(child_alive);
+  struct semaphore child_alive;
+  struct thread * child;
+  struct thread * parent = thread_current();
+  struct list_elem *e;
 
-  return -1;
+  for (e = list_begin (&parent->children); e != list_end (&parent->children);
+       e = list_next (e))
+    {
+      child = list_entry (e, struct thread, child);
+      if(t->tid == child_tid) break;
+    }
+  
+  if(child == NULL||child->tid != child_tid) return -1; //thread with this tid is not a child of current thread
+  if(child->wait != NULL) return -1;//we are already waiting for this thread
+
+  sema_init(&child_alive, 0);
+  child->wait = &child_alive;
+  
+  if(child->status != THREAD_DYING) sema_down(&child_alive);
+  
+  child_alive = NULL;
+
+  return child->ret;
 }
 
 /* Free the current process's resources. */
@@ -200,6 +218,8 @@ process_exit (void)
       pagedir_activate (NULL);
       pagedir_destroy (pd);
     }
+
+  if(cur->wait != NULL) sema_up (cur->wait);
 }
 
 /* Sets up the CPU for running user code in the current
