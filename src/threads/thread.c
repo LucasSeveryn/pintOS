@@ -162,36 +162,44 @@ thread_tick (void)
     t->recent_cpu = F_ADD_INT(t->recent_cpu, 1);
   }
 
-
+  /* Checks whether there are any threads that needs to be woken up */
   struct list_elem *e;
   for (e = list_begin (&ready_ps.sleeping_list); e != list_end (&ready_ps.sleeping_list);
      e = list_next (e))
   {
-    bool woken_up = false;
-    struct thread *t = list_entry (e, struct thread, elem);
-    woken_up = thread_wakeup( t, NULL);
+    bool woken_up = true;
+    struct thread *thread_to_wake = list_entry (e, struct thread, elem);
+    woken_up = thread_wakeup( thread_to_wake, NULL);
     if( ! woken_up ){
-      struct list_elem *woken_up_elem;
-      
-      for (woken_up_elem = list_begin (&ready_ps.sleeping_list); woken_up_elem != e;
-     woken_up_elem = list_next (woken_up_elem))
-      {
-       struct thread *woken_thread = list_entry (woken_up_elem, struct thread, elem);
-       list_remove (&woken_thread->elem);
-       th->pss = NULL;
-       
-       ps_push (&ready_ps, woken_thread );
-      }
       break;
     }
   }
-  
+
+  /* Actually moves threads from sleeping queue to ready queue */
+  if (e != list_begin (&ready_ps.sleeping_list))
+  {
+    struct list_elem *woken_elem;
+    e = list_prev (e);
+    while(woken_elem != e)
+    {
+      woken_elem = list_pop_front (&ready_ps.sleeping_list);
+      ps_push( &ready_ps, list_entry (woken_elem, struct thread, elem));
+    }
+  }
+
+  /* Recalculates priority for each thread and calculates load_avg */  
   if (thread_mlfqs && timer_ticks() % TIMER_FREQ == 0) {
-    thread_foreach (thread_recalculate_recent_cpu, NULL);
+    thread_foreach (&thread_recalculate_recent_cpu, NULL);
     load_avg = F_ADD(F_MUL(F_DIV_INT(F_TO_FIXED(59), 60), load_avg), F_MUL_INT(F_DIV_INT(F_TO_FIXED(1), 60), (ready_ps.size + (thread_current() != idle_thread))));
   }
 
-  if ( thread_mlfqs && timer_ticks() % 4 == 3) {
+  /* Recomputes priority for each thread 
+   Even though its not necessary some edge cases require it.
+   These might not be common, however, we prefer to comply
+   with the specification and always schedule thread with
+   highest actual priority
+  */
+  if ( thread_mlfqs && timer_ticks() % 4 == 0) {
     thread_foreach (&thread_recalculate_priority, NULL);
   }
 
@@ -405,9 +413,8 @@ thread_sleep (void)
   cur->status = THREAD_SLEEPING;
   if (cur != idle_thread){
     ps_insert_sleeping( &ready_ps, cur );
+    ready_ps.sleeping++;
   }
-  ready_ps.sleeping++;
-
   schedule ();
   intr_set_level (old_level);
 }
@@ -422,7 +429,6 @@ thread_wakeup( struct thread *t, void *d UNUSED ) {
   if( t->status == THREAD_SLEEPING && t->time_to_wake <= timer_ticks() ) {
     t->status = THREAD_READY;
     t->pss->sleeping--;
-
     return true;
   }
   return false;
@@ -688,7 +694,6 @@ next_thread_to_run (void)
     return idle_thread;
   else {
     th = ps_pop (&ready_ps);
-
     return th;
   }
 }
