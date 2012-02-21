@@ -4,9 +4,12 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+<<<<<<< HEAD
 #include "filesys/filesys.h"
 #include "devices/shutdown.h"
 #include "devices/input.h"
+=======
+>>>>>>> halt, exit, exec, wait, process_wait, write for fd = 1, have been initially written
 #include <kernel/stdio.h>
 
 void (*)(char* , struct intr_frame *) syscall_functions[NOA];
@@ -69,6 +72,7 @@ syscall_init (void)
   syscall_functions[SYS_EXIT] = &syscall_exit;
   syscall_functions[SYS_EXEC] = &syscall_exec;
   syscall_functions[SYS_WAIT] = &syscall_wait;
+<<<<<<< HEAD
   syscall_functions[SYS_CREATE] = &syscall_create;
   syscall_functions[SYS_REMOVE] = &syscall_remove;
   syscall_functions[SYS_OPEN] = &syscall_open;
@@ -78,11 +82,15 @@ syscall_init (void)
   syscall_functions[SYS_SEEK] = &syscall_seek;
   syscall_functions[SYS_SEEK] = &syscall_tell;
   syscall_functions[SYS_SEEK] = &syscall_close;
+=======
+  syscall_functions[SYS_WRITE] = &syscall_write;
+>>>>>>> halt, exit, exec, wait, process_wait, write for fd = 1, have been initially written
 
   syscall_noa[SYS_HALT] = 0;
   syscall_noa[SYS_EXIT] = 1;
   syscall_noa[SYS_EXEC] = 1;
   syscall_noa[SYS_WAIT] = 1;
+<<<<<<< HEAD
   syscall_noa[SYS_CREATE] = 2;
   syscall_noa[SYS_REMOVE] = 1;
   syscall_noa[SYS_OPEN] = 1;
@@ -93,6 +101,9 @@ syscall_init (void)
   syscall_noa[SYS_TELL] = 1;
   syscall_noa[SYS_CLOSE] = 1;
     
+=======
+  syscall_noa[SYS_WRITE] = 3;
+>>>>>>> halt, exit, exec, wait, process_wait, write for fd = 1, have been initially written
 }
 
 static void
@@ -101,6 +112,7 @@ syscall_handler (struct intr_frame *f)
   int syscall_number = *(f -> esp - 4);
   char * args = syscall_retrieve_args (f);
   int noa = (int) args[0];
+<<<<<<< HEAD
   syscall_functions[syscall_number]( args, f );
 }
 
@@ -108,6 +120,9 @@ static void
 syscall_t_exit ( char * p_name, int status){
   printf ("%s: exit(%d)\n", p_name, status);
   thread_exit ();
+=======
+  f->eax = syscall_functions[syscall_number]( args, f );
+>>>>>>> halt, exit, exec, wait, process_wait, write for fd = 1, have been initially written
 }
 
 static char *
@@ -130,28 +145,44 @@ syscall_retrieve_args(struct intr_frame *f, struct intr_frame *f){
 
 static void 
 syscall_halt(char * args, struct intr_frame *f){
+<<<<<<< HEAD
   shutdown_power_off ();
+=======
+  shutdown_power_off();
+>>>>>>> halt, exit, exec, wait, process_wait, write for fd = 1, have been initially written
 }
 
 static void 
 syscall_exit(char * args, struct intr_frame *f){
+<<<<<<< HEAD
   bool put_status = put_user (f->eax, args[1]);
   thread_current () -> ret = args[1];
   syscall_t_exit (thread_current () -> name, args[1]);
+=======
+  f->eax = args[1];
+  thread_current() -> ret = args[1];
+  thread_exit();
+>>>>>>> halt, exit, exec, wait, process_wait, write for fd = 1, have been initially written
 }
 
 static void 
 syscall_exec(char * args, struct intr_frame *f){
   struct thread * parent = thread_current();
   tid_t id = process_execute (args);
+<<<<<<< HEAD
   if(id!=-1) thread_add_child (parent, id);
 
   bool put_status = put_user (f->eax, id);
   if( !put_status) syscall_t_exit (thread_current () -> name, -1);
+=======
+  if(id!=-1)thread_add_child (parent, id);
+  f->eax = id;
+>>>>>>> halt, exit, exec, wait, process_wait, write for fd = 1, have been initially written
 }
 
 static void 
 syscall_wait( char * args, struct intr_frame *f ){
+<<<<<<< HEAD
   bool put_status = put_user (f->eax, process_wait (args[1]));
   if( !put_status) syscall_t_exit (thread_current () -> name, -1);
 }
@@ -186,6 +217,25 @@ syscall_open( char * args, struct intr_frame *f ){
 
     bool put_status = put_user (f->eax, fd);
     if( !put_status) syscall_t_exit (thread_current () -> name, -1);
+=======
+  f->eax = process_wait( args[1] );
+}
+
+static void 
+syscall_write( char * args, struct intr_frame *f ){
+  if(args[1] == 1){
+    uint8_t buffer_addr = args[2];
+    size_t size = args[3];
+    char * buffer = (char *)malloc(size +1);
+
+    int i;
+    for(i = 0; i < size; i++){
+      char byte = get_user(buffer_addr+i);
+      buffer[i] = byte;
+    }
+
+    putbuf(buffer, size);
+>>>>>>> halt, exit, exec, wait, process_wait, write for fd = 1, have been initially written
   }
 }
 

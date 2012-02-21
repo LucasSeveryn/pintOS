@@ -116,10 +116,6 @@ struct thread
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
 
-    struct thread * parent;             /* parent of the thread */
-    struct list_elem child;             
-    struct list children;               /* children of the thread */
-
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
@@ -179,8 +175,11 @@ int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
 struct thread* get_thread_by_tid(tid_t);
+<<<<<<< HEAD
 struct file_handle * thread_get_file(int);
 int thread_add_file(struct file *);
 bool thread_remove_file(int);
+=======
+>>>>>>> halt, exit, exec, wait, process_wait, write for fd = 1, have been initially written
 
 #endif /* threads/thread.h */

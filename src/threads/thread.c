@@ -686,8 +686,11 @@ init_thread (struct thread *t, const char *name, int priority)
   list_init (&t->held_locks);
   #ifdef USERPROG
   list_init (&t->children);
+<<<<<<< HEAD
   hash_init (&t->files,  file_hash, file_less, NULL);
   t->next_fd = 2;
+=======
+>>>>>>> halt, exit, exec, wait, process_wait, write for fd = 1, have been initially written
   #endif
   t->magic = THREAD_MAGIC;
 
@@ -787,6 +790,19 @@ get_thread_by_tid (tid_t id){
     return NULL;
 }
 
+<<<<<<< HEAD
+=======
+#ifdef USERPROG
+void
+thread_add_child (struct thread * parent, tid_t child_id){
+  struct thread * child = get_thread_by_tid (child_id);
+  
+  child -> parent = parent;
+  list_push_back (&parent -> children, &child->child);
+}
+#endif
+
+>>>>>>> halt, exit, exec, wait, process_wait, write for fd = 1, have been initially written
 /* Schedules a new process.  At entry, interrupts must be off and
    the running process's state must have been changed from
    running to some other state.  This function finds another
