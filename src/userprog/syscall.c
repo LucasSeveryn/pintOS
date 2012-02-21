@@ -14,6 +14,10 @@ static int
 get_user (const uint8_t *uaddr)
 {
 	int result;
+	if (!((void *) uaddr < PHYS_BASE)) 
+		printf ("Trying to access memory address: %p, which is kernel memory address\n", uaddr);
+		return -1;
+	}
 	asm ("movl $1f, %0; movzbl %1, %0; 1:"
 		: "=&a" (result) : "m" (*uaddr));
 	return result;
@@ -25,42 +29,14 @@ static bool
 put_user (uint8_t *udst, uint8_t byte)
 {
 	int error_code;
-	asm ("movl $1f, %0; movb %b2, %1; 1:"
-		: "=&a" (error_code), "=m" (*udst) : "q" (byte));
-	return error_code != -1;
-}
-
-// USE THIS SHIT TO ACCESS MEMORY
-/* Wrapper to retrieve address specified by user pointer */
-static int
-get_data_user (const uint8_t *uaddr)
-{
-	if ((void *) uaddr < PHYS_BASE) 
-	{
-		return get_user (uaddr);
-	}
-	else
-	{
-		printf ("Trying to access memory address: %p, which is kernel memory address\n", uaddr);
-		return -1;
-	}
-}
-
-// USE THIS SHIT TO ACCESS MEMORY
-/* Wrapper to write to user address specified by user pointer */
-static bool 
-put_data_user (uint8_t *udst, uint8_t byte)
-{
-	if ((void *) udst < PHYS_BASE)
-	{
-		return put_user (udst, byte);
-	}
-	else
-	{
+	if (!((void *) uaddr < PHYS_BASE)) 
 		printf ("Trying to write to memory address: %p, value %u.\n",
 				 udst, byte);
 		return false;
 	}
+	asm ("movl $1f, %0; movb %b2, %1; 1:"
+		: "=&a" (error_code), "=m" (*udst) : "q" (byte));
+	return error_code != -1;
 }
 
 void
