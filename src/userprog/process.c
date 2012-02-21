@@ -57,11 +57,11 @@ start_process (void *file_name_)
   bool success;
 
   int arguments_length = strlen (file_name);
-
   /* ----- */
 
   char *rest; 
   char *token; 
+  printf("Length of file_name: %d\n", strlen(file_name));
   char *s = (char *)malloc (strlen (file_name) + 1);   // Allocate memory
   if (s != NULL)
     strlcpy (s,file_name,strlen(file_name) + 1);                    // Copy string if okay
@@ -149,6 +149,10 @@ pintos --filesys-size=2 -p ../../examples/echo -a echo -- -f -q run 'echo calkie
 
    printf("Current address of esp %p and its value %d\n", if_.esp, *(int *)if_.esp);
 
+  while((token = strtok_r(NULL, " ", &rest))) { 
+    *++cur_args = token;
+    argc++;
+  }
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
      threads/intr-stubs.S).  Because intr_exit takes all of its
