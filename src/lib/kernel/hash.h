@@ -31,6 +31,8 @@ struct hash_elem
     struct list_elem list_elem;
   };
 
+#define HASH_INITIALIZED 546546
+
 /* Converts pointer to hash element HASH_ELEM into a pointer to
    the structure that HASH_ELEM is embedded inside.  Supply the
    name of the outer structure STRUCT and the member name MEMBER
@@ -58,6 +60,7 @@ typedef void hash_action_func (struct hash_elem *e, void *aux);
 /* Hash table. */
 struct hash 
   {
+    int initialized;
     size_t elem_cnt;            /* Number of elements in table. */
     size_t bucket_cnt;          /* Number of buckets, a power of 2. */
     struct list *buckets;       /* Array of `bucket_cnt' lists. */

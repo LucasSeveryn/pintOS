@@ -32,7 +32,10 @@ tid_t
 process_execute (const char *file_name) 
 {
   char *fn_copy;
+  char *fn_exec_copy;
+  char *rest;
   tid_t tid;
+  struct thread * parent = thread_current(); 
 
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
@@ -41,10 +44,22 @@ process_execute (const char *file_name)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
 
+  fn_exec_copy = palloc_get_page (0);
+  if (fn_exec_copy == NULL)
+    return TID_ERROR;
+  strlcpy (fn_exec_copy, file_name, PGSIZE);
+
+  char *exec_file_name = strtok_r (fn_exec_copy, " ", &rest);
+
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
-  if (tid == TID_ERROR)
+  tid = thread_create (exec_file_name, PRI_DEFAULT, start_process, fn_copy);
+
+  if (tid == TID_ERROR) {
     palloc_free_page (fn_copy); 
+    palloc_free_page (fn_exec_copy);
+  }
+
+  thread_add_child (parent, tid);
   return tid;
 }
 
@@ -179,7 +194,7 @@ process_wait (tid_t child_tid UNUSED)
        e = list_next (e))
     {
       child = list_entry (e, struct thread, child);
-      if(t->tid == child_tid) break;
+      if(child->tid == child_tid) break;
     }
   
   if(child == NULL||child->tid != child_tid) return -1; //thread with this tid is not a child of current thread
@@ -189,8 +204,6 @@ process_wait (tid_t child_tid UNUSED)
   child->wait = &child_alive;
   
   if(child->status != THREAD_DYING) sema_down(&child_alive);
-  
-  child_alive = NULL;
 
   return child->ret;
 }
