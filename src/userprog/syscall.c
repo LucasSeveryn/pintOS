@@ -244,7 +244,6 @@ syscall_open (int * args, struct intr_frame *f )
   int fd = thread_add_file (file);
 
   f->eax = fd;
-
 }
 
 static void 
