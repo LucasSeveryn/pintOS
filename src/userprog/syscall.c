@@ -109,6 +109,12 @@ syscall_t_exit ( char * p_name, int status){
   thread_exit ();
 }
 
+static void
+syscall_t_exit ( char * p_name, int status){
+  printf ("%s: exit(%d)\n", p_name, status);
+  thread_exit ();
+}
+
 static char *
 syscall_retrieve_args(struct intr_frame *f, struct intr_frame *f){
   char * args = new (char*)[3];

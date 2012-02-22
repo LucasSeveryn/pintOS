@@ -128,23 +128,8 @@ struct thread
     struct list_elem child;             
     struct list children;               /* children of the thread */
 
-#ifdef USERPROG
-    /* Owned by userprog/process.c. */
-    uint32_t *pagedir;                  /* Page directory. */
-
-    int ret;
-
-    struct semaphore * wait; 
-
-    struct thread * parent;             /* parent of the thread */
-    struct list_elem child;             
-    struct list children;               /* children of the thread */
-
-<<<<<<< HEAD
     struct hash files;                  /*  files opened by the process*/
     int next_fd;
-=======
->>>>>>> halt, exit, exec, wait, process_wait, write for fd = 1, have been initially written
 #endif
 
     /* Owned by thread.c. */
