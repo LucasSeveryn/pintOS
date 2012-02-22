@@ -72,7 +72,8 @@ start_process (void *file_name_)
   char * file_name_token = strtok_r(s, " ", &rest);
   
   /* Array reserved for arguments */
-  char **args = (char **)malloc((strlen(file_name)+1)*sizeof(char));
+  printf("Length of s: %d\nLength of first token: %d\n", strlen(file_name), strlen(file_name_token));
+  char **args = (char **)malloc((strlen(file_name) - strlen(file_name_token))*sizeof(char));
   char **cur_args = args;
 
   /* Initialize interrupt frame and load executable. */
