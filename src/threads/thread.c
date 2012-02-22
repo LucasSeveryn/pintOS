@@ -378,6 +378,17 @@ thread_exit (void)
 
 #ifdef USERPROG
   process_exit ();
+  struct list_elem *e;
+  struct file_handle * fh;
+
+  //Close open files
+  for (e = list_begin (&thread_current ()->children); e != list_end (&thread_current ()->children); e = list_next (e))
+    {
+      fh = hash_entry (e, struct file_handle, hash_elem);
+      file_close (fh -> file);
+    }
+  //Destroy files table
+  hash_destroy (&thread_current ()->children, NULL);
 #endif
 
   /* Remove thread from all threads list, set our status to dying,
@@ -675,6 +686,8 @@ init_thread (struct thread *t, const char *name, int priority)
   list_init (&t->held_locks);
   #ifdef USERPROG
   list_init (&t->children);
+  hash_init (&t->files,  file_hash, file_less, NULL);
+  t->next_fd = 2;
   #endif
   t->magic = THREAD_MAGIC;
 
@@ -774,16 +787,6 @@ get_thread_by_tid (tid_t id){
     return NULL;
 }
 
-#ifdef USERPROG
-void
-thread_add_child (struct thread * parent, tid_t child_id){
-  struct thread * child = get_thread_by_tid (child_id);
-  
-  child -> parent = parent;
-  list_push_back (&parent -> children, &child->child);
-}
-#endif
-
 /* Schedules a new process.  At entry, interrupts must be off and
    the running process's state must have been changed from
    running to some other state.  This function finds another
@@ -824,3 +827,68 @@ allocate_tid (void)
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
+
+
+#ifdef USERPROG
+unsigned 
+file_hash(const struct hash_elem * el, void *aux UNUSED){
+  const struct file_handle *e = hash_entry (el, struct file_handle, hash_elem);
+  return hash_int (&e->fd);
+}
+
+bool 
+file_less(const struct hash_elem* a_, const struct hash_elem* b_, void * aux UNUSED){
+  const struct file_handle *a = hash_entry (a_, struct file_handle, hash_elem);
+  const struct file_handle *b = hash_entry (b_, struct file_handle, hash_elem);
+    return a->fd < b->fd;
+}
+
+struct file_handle * 
+thread_get_file(int fd){
+  struct file f;
+  struct file_handle * fh;
+  struct thread * t = thread_current();
+  
+  fh.fd = fd;
+  struct hash_elem *he = hash_find (&t->files, &fh.hash_elem);
+  
+  if(he != NULL){
+    file_handle = hash_entry (he, struct file_handle, hash_elem);
+    return file_handle;
+  } else {
+    return NULL;  
+  }
+
+}
+
+int 
+thread_add_file(struct file * file){
+  struct file_handle fh;
+  struct thread * t = thread_current();
+
+  fh.fd = next_fd++;
+  fh.file = file;
+
+  hash_insert (&t->files, &fh.hash_elem);
+
+  return fh.fd;
+}
+
+void
+thread_remove_file(int fd){
+  struct file_handle fh;
+  struct thread * t = thread_current();
+
+  fh.fd = fd;
+
+  hash_remove (&t->files, &fh.hash_elem);
+}
+
+void
+thread_add_child (struct thread * parent, tid_t child_id){
+  struct thread * child = get_thread_by_tid (child_id);
+  
+  child -> parent = parent;
+  list_push_back (&parent -> children, &child->child);
+}
+#endif

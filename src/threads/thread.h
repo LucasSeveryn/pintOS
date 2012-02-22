@@ -3,6 +3,7 @@
 
 #include <debug.h>
 #include <list.h>
+#include <hash.h>
 #include <stdint.h>
 #include "filesys/file.h"
 
@@ -85,6 +86,12 @@ typedef int tid_t;
    ready state is on the run queue, whereas only a thread in the
    blocked state is on a semaphore wait list. */
 
+struct file_handle{
+  int fd;
+  struct file * file;
+  struct hash_elem hash_elem;
+};
+
 struct thread
   {
     /* Owned by thread.c. */
@@ -121,18 +128,8 @@ struct thread
     struct list_elem child;             
     struct list children;               /* children of the thread */
 
-#ifdef USERPROG
-    /* Owned by userprog/process.c. */
-    uint32_t *pagedir;                  /* Page directory. */
-
-    int ret;
-
-    struct semaphore * wait; 
-
-    struct thread * parent;             /* parent of the thread */
-    struct list_elem child;             
-    struct list children;               /* children of the thread */
-
+    struct hash files;                  /*  files opened by the process*/
+    int next_fd;
 #endif
 
     /* Owned by thread.c. */
@@ -178,5 +175,8 @@ int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
 struct thread* get_thread_by_tid(tid_t);
+struct file_handle * thread_get_file(int);
+int thread_add_file(struct file *);
+bool thread_remove_file(int);
 
 #endif /* threads/thread.h */
