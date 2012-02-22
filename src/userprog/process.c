@@ -82,7 +82,7 @@ start_process (void *file_name_)
     PANIC("Out of memory, trying to alocate %d bytes.\n", arguments_length);
 
   /* Tokenising rest of arguments */
-  int argc=0;
+  int argc     = 0;
   args[argc++] = exec_file_name;
 
   /* Due to carlessness of the user we can have multiple
@@ -121,7 +121,8 @@ start_process (void *file_name_)
   *(int *)if_.esp = 0;
   if(DEBUG)printf("Current address of esp %p and its value %d\n", if_.esp, *(int *)if_.esp);
   
-  for (i = argc - 1; i >= 0; i--) {
+  for (i = argc - 1; i >= 0; i--)
+  {
     if_.esp -= 4;
     *(void **)(if_.esp) = addresses[i];
     if(DEBUG)printf("Current address of esp %p and its value %p\n", if_.esp, *(char **)if_.esp);
