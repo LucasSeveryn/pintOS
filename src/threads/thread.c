@@ -790,16 +790,6 @@ get_thread_by_tid (tid_t id){
     return NULL;
 }
 
-#ifdef USERPROG
-void
-thread_add_child (struct thread * parent, tid_t child_id){
-  struct thread * child = get_thread_by_tid (child_id);
-  
-  child -> parent = parent;
-  list_push_back (&parent -> children, &child->child);
-}
-#endif
-
 /* Schedules a new process.  At entry, interrupts must be off and
    the running process's state must have been changed from
    running to some other state.  This function finds another
