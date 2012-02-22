@@ -19,6 +19,7 @@
 #include "threads/vaddr.h"
 #include "threads/malloc.h"
 
+bool DEBUG = false;
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
@@ -55,105 +56,97 @@ start_process (void *file_name_)
   char *file_name = file_name_;
   struct intr_frame if_;
   bool success;
-
-  int arguments_length = strlen (file_name);
-  /* ----- */
-
   char *rest; 
   char *token; 
-  printf("Length of file_name: %d\n", strlen(file_name));
-  char *s = (char *)malloc (strlen (file_name) + 1);   // Allocate memory
-  if (s != NULL)
-    strlcpy (s,file_name,strlen(file_name) + 1);                    // Copy string if okay
-  
 
+  int arguments_length = strlen (file_name) + 1;
+  if(DEBUG)printf("Length of command line arguments %d.\n", arguments_length);
 
   /* Token gains the filename value */
-  char * file_name_token = strtok_r(s, " ", &rest);
+  char *exec_file_name = strtok_r (file_name, " ", &rest);
   
-  /* Array reserved for arguments */
-  printf("Length of s: %d\nLength of first token: %d\n", strlen(file_name), strlen(file_name_token));
-  char **args = (char **)malloc((strlen(file_name) - strlen(file_name_token))*sizeof(char));
-  char **cur_args = args;
-
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
-  success = load (file_name_token, &if_.eip, &if_.esp);
+  success = load (exec_file_name, &if_.eip, &if_.esp);
 
   /* If load failed, quit. */
-  palloc_free_page (file_name);
-  if (!success) 
+  if (!success)
     thread_exit ();
+
+  /* Array reserved for arguments */
+  char **args = (char **) malloc (arguments_length * sizeof(char));
+  if (args == NULL)
+    PANIC("Out of memory, trying to alocate %d bytes.\n", arguments_length);
 
   /* Tokenising rest of arguments */
   int argc=0;
-  
-  *cur_args = file_name_token;
-  cur_args++;
-  ++argc;  
+  args[argc++] = exec_file_name;
 
-  while((token = strtok_r(NULL, " ", &rest))) { 
-    *cur_args = token;
-    cur_args++;
-    ++argc;
+  /* Due to carlessness of the user we can have multiple
+  consecutive spaces which would break word alignment formula.
+  Therefore we need to calculate the actual lenght of arguments*/
+  arguments_length = strlen (exec_file_name) + 1;
+
+  while((token = strtok_r(NULL, " ", &rest))) {
+    arguments_length += strlen (token) + 1;
+    args[argc++] = token;
   }
 
-  int **addresses = (int **)malloc(argc*sizeof(int *));
-    /*
-pintos --filesys-size=2 -p ../../examples/echo -a echo -- -f -q run 'echo calkiem duzo roznych argow'
-  */
-  printf("argc %d\n", argc);
-   
+  if(DEBUG)printf("Actual length of command line arguments %d.\n", arguments_length);
+
+  int **addresses = (int **) malloc (argc * sizeof(int *));
+
+  if(DEBUG)printf("argc %d\n", argc);
+
   int i;
-  for(i=argc-1;i>=0;i--){
-    // memcpy ( void * destination, const void * source, size_t num );
-     if_.esp-=(strlen(args[i])+1);
-     addresses[i] = if_.esp;
-     printf("if_.esp = %p \n",addresses[i]);
-     printf("Current token %s.\n", args[i]);
-     memcpy ( if_.esp, args[i], strlen(args[i])+1);
-     printf("value: %s.\n", (char *)if_.esp);
-
+  for (i = argc - 1; i >= 0; i--)
+  {
+    int arg_length = strlen(args[i])+1;
+    if_.esp -= arg_length;
+    addresses[i] = if_.esp;
+    memcpy ( if_.esp, args[i], arg_length);
+    if(DEBUG)printf("Current address of esp %p and its value %s\n", if_.esp, (char *)if_.esp);
   }
-  printf("srtlen %d\n",arguments_length);
-  if_.esp -= arguments_length % 4;
-  printf("\nif_.esp = %p \n",if_.esp);
 
-  printf("wyszlsmy z loopa \n");
+  int word_align_offset = arguments_length % 4;
+  if_.esp -= word_align_offset != 0 ? 4 - word_align_offset : 0 ;
+  if(DEBUG)printf("word alignment\n");
+  if(DEBUG)printf("Current address of esp %p \n",if_.esp);
 
-  /* push 0, decrement by 4 */
+  /* push 0 sentinel argument */
   if_.esp -= 4;
   *(int *)if_.esp = 0;
-  printf("Current address of esp %p and its value %d\n", if_.esp, *(int *)if_.esp);
-  for(i=argc-1; i>=0; i--) {
+  if(DEBUG)printf("Current address of esp %p and its value %d\n", if_.esp, *(int *)if_.esp);
+  
+  for (i = argc - 1; i >= 0; i--) {
     if_.esp -= 4;
     *(void **)(if_.esp) = addresses[i];
-    printf("Current address of esp %p and its value %p\n", if_.esp, *(char **)if_.esp);
+    if(DEBUG)printf("Current address of esp %p and its value %p\n", if_.esp, *(char **)if_.esp);
   }
 
-    /* adding argv */
+  /* adding argv */
   if_.esp-=4;
-  *(char**)if_.esp=if_.esp+4;
-  printf("Current address of esp %p and its value %p\n", if_.esp, *(char **)if_.esp);
+  *(char **)if_.esp = if_.esp + 4;
+  if(DEBUG)printf("Current address of esp %p and its value %p\n", if_.esp, *(char **)if_.esp);
 
     /* adding argc */
   if_.esp-=4;
-  *(int*)if_.esp=argc;
-  printf("Current address of esp %p and its value %d\n", if_.esp, *(int *)if_.esp);
+  *(int *)if_.esp = argc;
+  if(DEBUG)printf("Current address of esp %p and its value %d\n", if_.esp, *(int *)if_.esp);
 
-    /* adding argc */
+    /* adding fake return address */
   if_.esp-=4;
-  *(int *)if_.esp=0;
+  *(int *)if_.esp = 0;
 
-   printf("Current address of esp %p and its value %d\n", if_.esp, *(int *)if_.esp);
+  if(DEBUG) printf("Current address of esp %p and its value %d\n", if_.esp, *(int *)if_.esp);
 
-  while((token = strtok_r(NULL, " ", &rest))) { 
-    *++cur_args = token;
-    argc++;
-  }
+  free (addresses);
+  free (args);
+  palloc_free_page (file_name);
+
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
      threads/intr-stubs.S).  Because intr_exit takes all of its
