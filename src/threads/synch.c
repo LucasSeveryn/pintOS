@@ -34,7 +34,7 @@
 
 /* Function for ordering waiting threads by priority */
 bool 
-order_by_priority (const struct list_elem *a, const struct list_elem *b, void *aux)
+order_by_priority (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
 {
   struct thread *tha = list_entry(a, struct thread, elem);
   struct thread *thb = list_entry(b, struct thread, elem);
@@ -347,7 +347,7 @@ struct semaphore_elem
 
 /* Function for ordering waiting threads by priority */
 bool 
-order_by_waiting_priority (const struct list_elem *a, const struct list_elem *b, void *aux)
+order_by_waiting_priority (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
 {
   struct semaphore_elem *sema = list_entry (a, struct semaphore_elem , elem);
   struct thread *th_waiting_a = sema->waiting_for;

@@ -78,7 +78,8 @@ void thread_recalculate_recent_cpu( struct thread * , void * );
 bool thread_wakeup( struct thread *, void * );
 void thread_recalculate_priority( struct thread * , void * );
 static tid_t allocate_tid (void);
-
+unsigned file_hash(const struct hash_elem *, void *);
+bool file_less(const struct hash_elem*, const struct hash_elem*, void *);
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
    general and it is possible in this case only because loader.S
@@ -378,17 +379,20 @@ thread_exit (void)
 
 #ifdef USERPROG
   process_exit ();
-  struct list_elem *e;
+  struct hash_iterator e;
   struct file_handle * fh;
 
   //Close open files
-  for (e = list_begin (&thread_current ()->children); e != list_end (&thread_current ()->children); e = list_next (e))
-    {
-      fh = hash_entry (e, struct file_handle, hash_elem);
-      file_close (fh -> file);
-    }
-  //Destroy files table
-  hash_destroy (&thread_current ()->children, NULL);
+  if(thread_current ()->files.initialized == HASH_INITIALIZED){
+    hash_first(&e, &thread_current ()->files);
+    while( hash_next(&e) )
+      {
+        fh = hash_entry (hash_cur(&e), struct file_handle, hash_elem);
+        file_close (fh -> file);
+      }
+    //Destroy files table
+    hash_destroy (&thread_current ()->files, NULL);
+  }
 #endif
 
   /* Remove thread from all threads list, set our status to dying,
@@ -686,7 +690,6 @@ init_thread (struct thread *t, const char *name, int priority)
   list_init (&t->held_locks);
   #ifdef USERPROG
   list_init (&t->children);
-  hash_init (&t->files,  file_hash, file_less, NULL);
   t->next_fd = 2;
   #endif
   t->magic = THREAD_MAGIC;
@@ -839,11 +842,10 @@ allocate_tid (void)
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
 
 
-#ifdef USERPROG
 unsigned 
 file_hash(const struct hash_elem * el, void *aux UNUSED){
   const struct file_handle *e = hash_entry (el, struct file_handle, hash_elem);
-  return hash_int (&e->fd);
+  return hash_int (e->fd);
 }
 
 bool 
@@ -853,18 +855,20 @@ file_less(const struct hash_elem* a_, const struct hash_elem* b_, void * aux UNU
     return a->fd < b->fd;
 }
 
+#ifdef USERPROG
 struct file_handle * 
 thread_get_file(int fd){
-  struct file f;
-  struct file_handle * fh;
+  struct file_handle fh;
+  struct file_handle * fh_found;
   struct thread * t = thread_current();
   
   fh.fd = fd;
+  if(t->files.initialized != HASH_INITIALIZED) return NULL;
   struct hash_elem *he = hash_find (&t->files, &fh.hash_elem);
   
   if(he != NULL){
-    file_handle = hash_entry (he, struct file_handle, hash_elem);
-    return file_handle;
+    fh_found = hash_entry (he, struct file_handle, hash_elem);
+    return fh_found;
   } else {
     return NULL;  
   }
@@ -876,9 +880,9 @@ thread_add_file(struct file * file){
   struct file_handle fh;
   struct thread * t = thread_current();
 
-  fh.fd = next_fd++;
+  fh.fd = t->next_fd++;
   fh.file = file;
-
+  if(t->files.initialized != HASH_INITIALIZED) hash_init (&t->files,  file_hash, file_less, NULL);
   hash_insert (&t->files, &fh.hash_elem);
 
   return fh.fd;
@@ -889,9 +893,9 @@ thread_remove_file(int fd){
   struct file_handle fh;
   struct thread * t = thread_current();
 
+  if(t->files.initialized != HASH_INITIALIZED) return;
   fh.fd = fd;
-
-  hash_remove (&t->files, &fh.hash_elem);
+  hash_delete (&t->files, &fh.hash_elem);
 }
 
 void

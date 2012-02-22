@@ -40,7 +40,7 @@ ps_push (struct priority_scheduler * ps, struct thread * th){
 
 
 bool 
-ps_sleeping_order  (const struct list_elem *a, const struct list_elem *b, void *aux)
+ps_sleeping_order  (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
 {
   struct thread *tha = list_entry(a, struct thread, elem);
   struct thread *thb = list_entry(b, struct thread, elem);

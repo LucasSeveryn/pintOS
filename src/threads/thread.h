@@ -177,6 +177,7 @@ int thread_get_load_avg (void);
 struct thread* get_thread_by_tid(tid_t);
 struct file_handle * thread_get_file(int);
 int thread_add_file(struct file *);
-bool thread_remove_file(int);
+void thread_remove_file(int);
 
+void thread_add_child (struct thread *, tid_t);
 #endif /* threads/thread.h */
