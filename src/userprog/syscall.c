@@ -58,11 +58,11 @@ get_user (const uint8_t *uaddr)
 	return result;
 }
 
-/* Reads a word at user virtual address UADDR.
+/* Reads a byte at user virtual address UADDR.
 UADDR must be below PHYS_BASE.
-Returns the word value if successful, -1 if a segfault occurred. */
+Returns the byte value if successful, -1 if a segfault occurred. */
 static int
-get_word_user (const int *uaddr)
+get_user_word (const int *uaddr)
 {
   int result;
   if ((void *) uaddr >= PHYS_BASE)

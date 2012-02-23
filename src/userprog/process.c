@@ -211,7 +211,11 @@ start_process (void *file_name_)
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
 int
+<<<<<<< HEAD
 process_wait (tid_t child_tid)
+=======
+process_wait (tid_t child_tid UNUSED)
+>>>>>>> spaces, and try to retrieve whole word at once from memory
 {
   struct semaphore * child_alive = malloc (sizeof (struct semaphore));
   struct semaphore * ret_saved = malloc (sizeof (struct semaphore));
@@ -233,6 +237,8 @@ process_wait (tid_t child_tid)
   sema_init(ret_saved, 0);
   child->child_alive = child_alive;
   child->ret_saved = ret_saved;
+
+  if(child->status != THREAD_DYING) sema_down(&child_alive);
 
   int ret = -1;
 
@@ -379,7 +385,6 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
   /* Open executable file. */
   file = filesys_open (file_name);
-
   if (file == NULL)
     {
       printf ("load: %s: open failed\n", file_name);
