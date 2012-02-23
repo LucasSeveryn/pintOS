@@ -41,7 +41,7 @@ static void syscall_close (int *, struct intr_frame *);
 static struct lock filesys_lock;
 static int syscall_noa[NOA];
 
-/* Reads a byte at user virtual address UADDR. 
+/* Reads a byte at user virtual address UADDR.
 UADDR must be below PHYS_BASE.
 Returns the byte value if successful, -1 if a segfault occurred. */
 static int
@@ -58,13 +58,31 @@ get_user (const uint8_t *uaddr)
 	return result;
 }
 
+/* Reads a byte at user virtual address UADDR.
+UADDR must be below PHYS_BASE.
+Returns the byte value if successful, -1 if a segfault occurred. */
+static int
+get_user_word (const int *uaddr)
+{
+  int result;
+  if ((void *) uaddr >= PHYS_BASE)
+  {
+    if(DEBUG) printf ("Trying to access memory address: %p, which is kernel memory address\n", uaddr);
+    return -1;
+  }
+  asm ("movl $1f, %0; movzwl %1, %0; 1:"
+    : "=&a" (result) : "m" (*uaddr));
+  if (DEBUG) printf("Result of get word is %d.\n", result);
+  return result;
+}
+
 /* Writes BYTE to user address UDST. UDST must be below PHYS_BASE.
 Returns true if successful, false if a segfault occurred. */
 static bool
 put_user (uint8_t *udst, uint8_t byte)
 {
 	int error_code;
-	if ((void *) udst >= PHYS_BASE) 
+	if ((void *) udst >= PHYS_BASE)
 	{
 		if(DEBUG) printf ("Trying to write to memory address: %p, value %u.\n",
 				 udst, byte);
@@ -75,7 +93,7 @@ put_user (uint8_t *udst, uint8_t byte)
 	return error_code != -1;
 }
 
-static int 
+static int
 get_safe(int * addr){
   int res = 0;
   int tmp;
@@ -91,7 +109,7 @@ get_safe(int * addr){
     if(i != 0) res <<= 8;
   }
   if(DEBUG) printf(" Result: %d.\n", res);
-  return res;  
+  return res;
 }
 
 void
@@ -107,7 +125,7 @@ filesys_lock_acquire ()
 };
 
 void
-syscall_init (void) 
+syscall_init (void)
 {
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 
@@ -143,9 +161,10 @@ syscall_init (void)
 }
 
 static void
-syscall_handler (struct intr_frame *f) 
+syscall_handler (struct intr_frame *f)
 {
   int syscall_number = get_safe((int *)(f -> esp));
+  get_user_word((int *)(f->esp));
   if(syscall_number < SYS_HALT || syscall_number > SYS_CLOSE){
     syscall_t_exit (thread_current () -> name, -1);
   }
@@ -170,7 +189,7 @@ syscall_retrieve_args (struct intr_frame *f)
 
   int i;
   for(i = 0; i <= noa; i++){
-    args[i] = get_safe((int*)(f -> esp) + i);
+    args[i] = get_user((uint8_t*)(f -> esp) + i * 4);
     if(args[i] == -1){
       syscall_t_exit (thread_current () -> name, -1);
     }
@@ -178,15 +197,15 @@ syscall_retrieve_args (struct intr_frame *f)
   }
 
   return args;
-} 
+}
 
-static void 
+static void
 syscall_halt (int * args UNUSED, struct intr_frame *f UNUSED)
 {
   shutdown_power_off ();
 }
 
-static void 
+static void
 syscall_exit (int * args, struct intr_frame *f)
 {
   f->eax = args[1];
@@ -194,7 +213,7 @@ syscall_exit (int * args, struct intr_frame *f)
   syscall_t_exit (thread_current () -> name, args[1]);
 }
 
-static void 
+static void
 syscall_exec (int * args, struct intr_frame *f)
 {
   struct thread * parent = thread_current();
@@ -204,14 +223,14 @@ syscall_exec (int * args, struct intr_frame *f)
   f->eax = id;
 }
 
-static void 
+static void
 syscall_wait (int * args, struct intr_frame *f )
 {
   f->eax = process_wait (args[1]);
 }
 
 
-static void 
+static void
 syscall_create (int * args, struct intr_frame *f )
 {
   if((char*)args[1] == NULL) syscall_t_exit (thread_current () -> name, -1);
@@ -221,32 +240,32 @@ syscall_create (int * args, struct intr_frame *f )
   filesys_lock_release ();
 }
 
-static void 
+static void
 syscall_remove (int * args, struct intr_frame *f )
 {
   if((char*)args[1] == NULL) syscall_t_exit (thread_current () -> name, -1);
-  
+
   filesys_lock_acquire ();
   f->eax = filesys_remove ((char*)args[1]);
   filesys_lock_release ();
 }
 
-static void 
+static void
 syscall_open (int * args, struct intr_frame *f )
 {
   if((char*)args[1] == NULL) syscall_t_exit (thread_current () -> name, -1);
-    
+
   filesys_lock_acquire ();
   struct file * file = filesys_open ((char*)args[1]);
   filesys_lock_release ();
-  
+
   if(file == NULL) syscall_t_exit (thread_current () -> name, -1);
   int fd = thread_add_file (file);
 
   f->eax = fd;
 }
 
-static void 
+static void
 syscall_filesize (int * args, struct intr_frame *f )
 {
   struct file_handle * fh = thread_get_file (args[1]);
@@ -256,7 +275,7 @@ syscall_filesize (int * args, struct intr_frame *f )
 }
 
 
-static void 
+static void
 syscall_read (int * args, struct intr_frame *f )
 {
   if( args[1] == 0){
@@ -267,7 +286,7 @@ syscall_read (int * args, struct intr_frame *f )
 
     filesys_lock_acquire ();
     for( ; i < args[3]; i++){
-      buffer[i] = input_getc();      
+      buffer[i] = input_getc();
     }
     filesys_lock_release ();
 
@@ -275,7 +294,7 @@ syscall_read (int * args, struct intr_frame *f )
   } else if(args[1] == 1){
     //ERROR - we are trying to read from output :P
   } else {
-    struct file_handle * fh = thread_get_file (args[1]); 
+    struct file_handle * fh = thread_get_file (args[1]);
     if( fh == NULL) syscall_t_exit (thread_current () -> name, -1);
 
     filesys_lock_acquire ();
@@ -286,7 +305,7 @@ syscall_read (int * args, struct intr_frame *f )
   }
 }
 
-static void 
+static void
 syscall_write (int * args, struct intr_frame *f)
 {
   if( args[1] == 0){
@@ -297,10 +316,10 @@ syscall_write (int * args, struct intr_frame *f)
     if(get_status == -1) syscall_t_exit (thread_current () -> name, -1);
 
     size_t size = args[3];
-    
+
     int written = 0;
     filesys_lock_acquire ();
-    
+
     if(size < 512) putbuf ((char*)buffer, size);
     else {
       while( size > 512 ){
@@ -311,12 +330,12 @@ syscall_write (int * args, struct intr_frame *f)
       putbuf ((char*)(buffer + written), size);
       written+= size;
     }
-    
+
     filesys_lock_release ();
 
     f -> eax = written;
   } else {
-    struct file_handle * fh = thread_get_file (args[1]); 
+    struct file_handle * fh = thread_get_file (args[1]);
     if( fh == NULL) syscall_t_exit (thread_current () -> name, -1);
 
     filesys_lock_acquire ();
@@ -327,18 +346,18 @@ syscall_write (int * args, struct intr_frame *f)
   }
 }
 
-static void 
+static void
 syscall_seek (int * args, struct intr_frame *f UNUSED)
 {
   struct file_handle * fh = thread_get_file (args[1]);
   if( fh == NULL) syscall_t_exit (thread_current () -> name, -1);
-  
+
   filesys_lock_acquire ();
   file_seek (fh->file, args[2]);
   filesys_lock_release ();
 }
 
-static void 
+static void
 syscall_tell (int * args, struct intr_frame *f){
   struct file_handle * fh = thread_get_file (args[1]);
   if( fh == NULL) syscall_t_exit (thread_current () -> name, -1);
@@ -349,7 +368,7 @@ syscall_tell (int * args, struct intr_frame *f){
   filesys_lock_release ();
 }
 
-static void 
+static void
 syscall_close (int * args, struct intr_frame *f UNUSED)
 {
   struct file_handle * fh = thread_get_file (args[1]);
