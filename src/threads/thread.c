@@ -13,6 +13,7 @@
 #include "threads/vaddr.h"
 #include "threads/priority_scheduler.h"
 #include "devices/timer.h"
+#include "threads/malloc.h"
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
@@ -78,8 +79,6 @@ void thread_recalculate_recent_cpu( struct thread * , void * );
 bool thread_wakeup( struct thread *, void * );
 void thread_recalculate_priority( struct thread * , void * );
 static tid_t allocate_tid (void);
-unsigned file_hash(const struct hash_elem *, void *);
-bool file_less(const struct hash_elem*, const struct hash_elem*, void *);
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
    general and it is possible in this case only because loader.S
@@ -266,8 +265,13 @@ thread_create (const char *name, int priority,
 
   /* Initialize thread. */
   init_thread (t, name, priority);
+  /*t->file_name = name;*/
   tid = t->tid = allocate_tid ();
 
+  #ifdef USERPROG
+  thread_add_child (thread_current(), tid);
+  #endif
+  
   /* Prepare thread for first run by initializing its stack.
      Do this atomically so intermediate values for the 'stack'
      member cannot be observed. */
@@ -375,23 +379,24 @@ thread_tid (void)
 void
 thread_exit (void)
 {
+  struct thread * t = thread_current();
+  
   ASSERT (!intr_context ());
 
 #ifdef USERPROG
+  if(t->child_alive != NULL) sema_up (t->child_alive);
+  if(t->ret_saved != NULL) sema_down (t->ret_saved);
+  
   process_exit ();
-  struct hash_iterator e;
+  struct list_elem *e;
   struct file_handle * fh;
 
   //Close open files
-  if(thread_current ()->files.initialized == HASH_INITIALIZED){
-    hash_first(&e, &thread_current ()->files);
-    while( hash_next(&e) )
-      {
-        fh = hash_entry (hash_cur(&e), struct file_handle, elem);
-        file_close (fh -> file);
-      }
-    //Destroy files table
-    hash_destroy (&thread_current ()->files, NULL);
+  while (!list_empty (&t->files))
+  {
+    e = list_pop_front (&t->files);
+    fh = list_entry (e, struct file_handle, elem);
+    free(fh);
   }
 #endif
 
@@ -400,7 +405,8 @@ thread_exit (void)
      when it calls thread_schedule_tail(). */
   intr_disable ();
 
-  list_remove (&thread_current()->allelem);
+  list_remove (&t->allelem);
+  list_remove(&t->child);
   thread_current ()->status = THREAD_DYING;
   schedule ();
   NOT_REACHED ();
@@ -690,6 +696,7 @@ init_thread (struct thread *t, const char *name, int priority)
   list_init (&t->held_locks);
   #ifdef USERPROG
   list_init (&t->children);
+  list_init (&t->files);
   t->next_fd = 2;
   #endif
   t->magic = THREAD_MAGIC;
@@ -831,61 +838,37 @@ allocate_tid (void)
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
 
-
-unsigned
-file_hash(const struct hash_elem * el, void *aux UNUSED){
-  const struct file_handle *e = hash_entry (el, struct file_handle, elem);
-  return hash_int (e->fd);
-}
-
-bool
-file_less(const struct hash_elem* a_, const struct hash_elem* b_, void * aux UNUSED){
-  const struct file_handle *a = hash_entry (a_, struct file_handle, elem);
-  const struct file_handle *b = hash_entry (b_, struct file_handle, elem);
-    return a->fd < b->fd;
-}
-
 #ifdef USERPROG
 struct file_handle *
 thread_get_file(int fd){
-  struct file_handle fh;
   struct file_handle * fh_found;
   struct thread * t = thread_current();
+  struct list_elem *e;
 
-  fh.fd = fd;
-  if(t->files.initialized != HASH_INITIALIZED) return NULL;
-  struct hash_elem *he = hash_find (&t->files, &fh.elem);
-
-  if(he != NULL){
-    fh_found = hash_entry (he, struct file_handle, elem);
-    return fh_found;
-  } else {
-    return NULL;
+  for (e = list_begin (&t->files); e != list_end (&t->files); e = list_next (e))
+  {
+    fh_found = list_entry (e, struct file_handle, elem);
+    if( fh_found -> fd == fd) return fh_found;
   }
 
+    return NULL;
 }
 
 int
 thread_add_file(struct file * file){
-  struct file_handle fh;
+  struct file_handle * fh = malloc(sizeof(struct file_handle));
   struct thread * t = thread_current();
 
-  fh.fd = t->next_fd++;
-  fh.file = file;
-  if(t->files.initialized != HASH_INITIALIZED) hash_init (&t->files,  file_hash, file_less, NULL);
-  hash_insert (&t->files, &fh.elem);
+  fh->fd = t->next_fd++;
+  fh->file = file;
+  list_push_front (&t->files, &fh->elem);
 
-  return fh.fd;
+  return fh->fd;
 }
 
 void
-thread_remove_file(int fd){
-  struct file_handle fh;
-  struct thread * t = thread_current();
-
-  if(t->files.initialized != HASH_INITIALIZED) return;
-  fh.fd = fd;
-  hash_delete (&t->files, &fh.elem);
+thread_remove_file(struct file_handle * fh){
+  list_remove (&fh -> elem);
 }
 
 void

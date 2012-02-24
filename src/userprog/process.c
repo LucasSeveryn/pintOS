@@ -21,6 +21,7 @@
 
 bool DEBUG = false;
 
+static struct semaphore child_loading;
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 
@@ -28,6 +29,11 @@ static bool load (const char *cmdline, void (**eip) (void), void **esp);
    FILENAME.  The new thread may be scheduled (and may even exit)
    before process_execute() returns.  Returns the new process's
    thread id, or TID_ERROR if the thread cannot be created. */
+void
+process_init (){
+  
+}
+
 tid_t
 process_execute (const char *file_name)
 {
@@ -36,30 +42,44 @@ process_execute (const char *file_name)
   char *rest;
   tid_t tid;
   struct thread * parent = thread_current();
-
+  parent->child_loading = malloc (sizeof (struct semaphore));
+  sema_init (parent->child_loading, 0);
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
   fn_copy = palloc_get_page (0);
-  if (fn_copy == NULL)
+  if (fn_copy == NULL){
+    free (parent->child_loading);
     return TID_ERROR;
+  }
   strlcpy (fn_copy, file_name, PGSIZE);
 
   fn_exec_copy = palloc_get_page (0);
-  if (fn_exec_copy == NULL)
+  if (fn_exec_copy == NULL){
+    free (parent->child_loading);
     return TID_ERROR;
+  }
   strlcpy (fn_exec_copy, file_name, PGSIZE);
 
   char *exec_file_name = strtok_r (fn_exec_copy, " ", &rest);
 
+  struct file * file=  filesys_open (exec_file_name);
+
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (exec_file_name, PRI_DEFAULT, start_process, fn_copy);
+
+  sema_down (parent->child_loading);
+  
+  if(file == NULL){
+    free (parent->child_loading);
+    return TID_ERROR;
+  }
 
   if (tid == TID_ERROR) {
     palloc_free_page (fn_copy);
     palloc_free_page (fn_exec_copy);
   }
 
-  thread_add_child (parent, tid);
+  free (parent->child_loading);
   return tid;
 }
 
@@ -86,6 +106,14 @@ start_process (void *file_name_)
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (exec_file_name, &if_.eip, &if_.esp);
+
+  if (success){ 
+    struct file * file = filesys_open (exec_file_name);
+    thread_add_file (file);
+    file_deny_write (file);
+  }
+
+  sema_up (thread_current()->parent->child_loading);
 
   /* If load failed, quit. */
   if (!success)
@@ -183,9 +211,10 @@ start_process (void *file_name_)
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
 int
-process_wait (tid_t child_tid UNUSED)
+process_wait (tid_t child_tid)
 {
-  struct semaphore child_alive;
+  struct semaphore * child_alive = malloc (sizeof (struct semaphore));
+  struct semaphore * ret_saved = malloc (sizeof (struct semaphore));
   struct thread * child;
   struct thread * parent = thread_current();
   struct list_elem *e;
@@ -198,14 +227,22 @@ process_wait (tid_t child_tid UNUSED)
     }
 
   if(child == NULL||child->tid != child_tid) return -1; //thread with this tid is not a child of current thread
-  if(child->wait != NULL) return -1;//we are already waiting for this thread
+  if(child->child_alive != NULL) return -1;//we are already waiting for this thread
 
-  sema_init(&child_alive, 0);
-  child->wait = &child_alive;
+  sema_init(child_alive, 0);
+  sema_init(ret_saved, 0);
+  child->child_alive = child_alive;
+  child->ret_saved = ret_saved;
 
-  if(child->status != THREAD_DYING) sema_down(&child_alive);
+  int ret = -1;
 
-  return child->ret;
+  if(child->status != THREAD_DYING) {
+    sema_down (child_alive);
+    ret = child -> ret;
+    sema_up (ret_saved);
+    sema_down (child_alive);
+  }
+  return ret;
 }
 
 /* Free the current process's resources. */
@@ -232,7 +269,7 @@ process_exit (void)
       pagedir_destroy (pd);
     }
 
-  if(cur->wait != NULL) sema_up (cur->wait);
+  if(cur->child_alive != NULL) sema_up (cur->child_alive);
 }
 
 /* Sets up the CPU for running user code in the current
@@ -342,6 +379,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
   /* Open executable file. */
   file = filesys_open (file_name);
+
   if (file == NULL)
     {
       printf ("load: %s: open failed\n", file_name);
