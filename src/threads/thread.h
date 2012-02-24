@@ -89,7 +89,7 @@ typedef int tid_t;
 struct file_handle{
   int fd;
   struct file * file;
-  struct hash_elem hash_elem;
+  struct hash_elem elem;
 };
 
 struct thread
@@ -122,10 +122,10 @@ struct thread
 
     int ret;
 
-    struct semaphore * wait; 
+    struct semaphore * wait;
 
     struct thread * parent;             /* parent of the thread */
-    struct list_elem child;             
+    struct list_elem child;
     struct list children;               /* children of the thread */
 
     struct hash files;                  /*  files opened by the process*/
@@ -166,7 +166,7 @@ typedef void thread_action_func (struct thread *t, void *aux);
 void thread_foreach (thread_action_func *, void *);
 
 int thread_get_priority (void);
-void thread_set_waiting_thread_priority (struct thread *, int); 
+void thread_set_waiting_thread_priority (struct thread *, int);
 void thread_set_priority (int);
 
 int thread_get_nice (void);

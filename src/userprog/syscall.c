@@ -141,8 +141,8 @@ syscall_init (void)
   syscall_functions[SYS_READ] = &syscall_read;
   syscall_functions[SYS_WRITE] = &syscall_write;
   syscall_functions[SYS_SEEK] = &syscall_seek;
-  syscall_functions[SYS_SEEK] = &syscall_tell;
-  syscall_functions[SYS_SEEK] = &syscall_close;
+  syscall_functions[SYS_TELL] = &syscall_tell;
+  syscall_functions[SYS_CLOSE] = &syscall_close;
 
   syscall_noa[SYS_HALT] = 0;
   syscall_noa[SYS_EXIT] = 1;
@@ -230,8 +230,7 @@ syscall_wait (int * args, struct intr_frame *f )
 static void
 syscall_create (int * args, struct intr_frame *f )
 {
-  uint8_t * file_name = (uint8_t *) args[1];
-  int get_status = get_user (file_name);
+  int get_status = get_user ((uint8_t *) args[1]);
   if(get_status == -1) syscall_t_exit (thread_current () -> name, -1);
 
   filesys_lock_acquire ();
@@ -242,7 +241,8 @@ syscall_create (int * args, struct intr_frame *f )
 static void
 syscall_remove (int * args, struct intr_frame *f )
 {
-  if((char*)args[1] == NULL) syscall_t_exit (thread_current () -> name, -1);
+  int get_status = get_user ((uint8_t *) args[1]);
+  if(get_status == -1) syscall_t_exit (thread_current () -> name, -1);
 
   filesys_lock_acquire ();
   f->eax = filesys_remove ((char*)args[1]);
@@ -252,10 +252,11 @@ syscall_remove (int * args, struct intr_frame *f )
 static void
 syscall_open (int * args, struct intr_frame *f )
 {
-  if((char*)args[1] == NULL) syscall_t_exit (thread_current () -> name, -1);
+  int get_status = get_user ((uint8_t *) args[1]);
+  if(get_status == -1) syscall_t_exit (thread_current () -> name, -1);
 
   filesys_lock_acquire ();
-  struct file * file = filesys_open ((char*)args[1]);
+  struct file * file = filesys_open ((char *)args[1]);
   filesys_lock_release ();
 
   int fd;
