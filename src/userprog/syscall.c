@@ -162,12 +162,7 @@ syscall_init (void)
 static void
 syscall_handler (struct intr_frame *f)
 {
-<<<<<<< HEAD
   int syscall_number = get_word_user((int *)(f -> esp));
-=======
-  int syscall_number = get_safe((int *)(f -> esp));
-  get_user_word((int *)(f->esp));
->>>>>>> 156ee1a0e07b2e8c3fa1279b60eddaa154153309
   if(syscall_number < SYS_HALT || syscall_number > SYS_CLOSE){
     syscall_t_exit (thread_current () -> name, -1);
   }
