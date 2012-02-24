@@ -839,6 +839,19 @@ allocate_tid (void)
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
 
+unsigned
+file_hash(const struct hash_elem * el, void *aux UNUSED){
+  const struct file_handle *e = hash_entry (el, struct file_handle, hash_elem);
+  return hash_int (e->fd);
+}
+
+bool
+file_less(const struct hash_elem* a_, const struct hash_elem* b_, void * aux UNUSED){
+  const struct file_handle *a = hash_entry (a_, struct file_handle, hash_elem);
+  const struct file_handle *b = hash_entry (b_, struct file_handle, hash_elem);
+    return a->fd < b->fd;
+}
+
 #ifdef USERPROG
 struct file_handle *
 thread_get_file(int fd){
