@@ -58,11 +58,11 @@ get_user (const uint8_t *uaddr)
 	return result;
 }
 
-/* Reads a byte at user virtual address UADDR.
+/* Reads a word at user virtual address UADDR.
 UADDR must be below PHYS_BASE.
-Returns the byte value if successful, -1 if a segfault occurred. */
+Returns the word value if successful, -1 if a segfault occurred. */
 static int
-get_user_word (const int *uaddr)
+get_word_user (const int *uaddr)
 {
   int result;
   if ((void *) uaddr >= PHYS_BASE)
@@ -162,10 +162,6 @@ syscall_init (void)
 static void
 syscall_handler (struct intr_frame *f)
 {
-  if( f->eax == -1 ){
-    syscall_t_exit (thread_current () -> name, -1);
-  }
-
   int syscall_number = get_word_user((int *)(f -> esp));
   if(syscall_number < SYS_HALT || syscall_number > SYS_CLOSE){
     syscall_t_exit (thread_current () -> name, -1);
