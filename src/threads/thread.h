@@ -89,11 +89,7 @@ typedef int tid_t;
 struct file_handle{
   int fd;
   struct file * file;
-<<<<<<< HEAD
   struct list_elem elem;
-=======
-  struct hash_elem elem;
->>>>>>> Spaces in some other files, some fixes for tests, syscall_close exhibits
 };
 
 struct thread
@@ -127,20 +123,15 @@ struct thread
 
     int ret;
 
-<<<<<<< HEAD
     struct semaphore * ret_saved;
     struct semaphore * child_alive;
     struct semaphore * child_loading;
-=======
-    struct semaphore * wait;
->>>>>>> Spaces in some other files, some fixes for tests, syscall_close exhibits
 
     struct thread * parent;             /* parent of the thread */
     struct list_elem child;
     struct list children;               /* children of the thread */
 
     struct list files;                  /*  files opened by the process*/
-    struct file * exec_file;
     int next_fd;
 #endif
 

@@ -271,7 +271,6 @@ thread_create (const char *name, int priority,
   #ifdef USERPROG
   thread_add_child (thread_current(), tid);
   #endif
-
   /* Prepare thread for first run by initializing its stack.
      Do this atomically so intermediate values for the 'stack'
      member cannot be observed. */
@@ -380,13 +379,11 @@ void
 thread_exit (void)
 {
   struct thread * t = thread_current();
-
   ASSERT (!intr_context ());
 
 #ifdef USERPROG
   if(t->child_alive != NULL) sema_up (t->child_alive);
   if(t->ret_saved != NULL) sema_down (t->ret_saved);
-
   process_exit ();
   struct list_elem *e;
   struct file_handle * fh;
@@ -838,19 +835,6 @@ allocate_tid (void)
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
-
-unsigned
-file_hash(const struct hash_elem * el, void *aux UNUSED){
-  const struct file_handle *e = hash_entry (el, struct file_handle, elem);
-  return hash_int (e->fd);
-}
-
-bool
-file_less(const struct hash_elem* a_, const struct hash_elem* b_, void * aux UNUSED){
-  const struct file_handle *a = hash_entry (a_, struct file_handle, elem);
-  const struct file_handle *b = hash_entry (b_, struct file_handle, elem);
-    return a->fd < b->fd;
-}
 
 #ifdef USERPROG
 struct file_handle *

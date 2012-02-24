@@ -162,6 +162,10 @@ syscall_init (void)
 static void
 syscall_handler (struct intr_frame *f)
 {
+  if( f->eax == -1 ){
+    syscall_t_exit (thread_current () -> name, -1);
+  }
+
   int syscall_number = get_word_user((int *)(f -> esp));
   if(syscall_number < SYS_HALT || syscall_number > SYS_CLOSE){
     syscall_t_exit (thread_current () -> name, -1);
@@ -223,13 +227,13 @@ syscall_exec (int * args, struct intr_frame *f)
 
   char validate = get_user((char*)args[1]);
   if(validate == -1) syscall_t_exit (thread_current () -> name, -1);
-
+  
   filesys_lock_acquire ();
-
+  
   tid_t id = process_execute ((char*)args[1]);
-
+  
   filesys_lock_release ();
-
+  
   f->eax = id;
 }
 
@@ -243,8 +247,8 @@ syscall_wait (int * args, struct intr_frame *f )
 static void
 syscall_create (int * args, struct intr_frame *f )
 {
-  int get_status = get_user ((uint8_t *) args[1]);
-  if(get_status == -1) syscall_t_exit (thread_current () -> name, -1);
+  char validate = get_user ((uint8_t *) args[1]);
+  if(validate == -1) syscall_t_exit (thread_current () -> name, -1);
 
   filesys_lock_acquire ();
   f->eax = filesys_create ((char*)args[1], args[2]);
@@ -254,8 +258,8 @@ syscall_create (int * args, struct intr_frame *f )
 static void
 syscall_remove (int * args, struct intr_frame *f )
 {
-  int get_status = get_user ((uint8_t *) args[1]);
-  if(get_status == -1) syscall_t_exit (thread_current () -> name, -1);
+  char validate = get_user ((uint8_t *) args[1]);
+  if(validate == -1) syscall_t_exit (thread_current () -> name, -1);
 
   filesys_lock_acquire ();
   f->eax = filesys_remove ((char*)args[1]);
@@ -265,8 +269,8 @@ syscall_remove (int * args, struct intr_frame *f )
 static void
 syscall_open (int * args, struct intr_frame *f )
 {
-  int get_status = get_user ((uint8_t *) args[1]);
-  if(get_status == -1) syscall_t_exit (thread_current () -> name, -1);
+  char validate = get_user ((uint8_t *) args[1]);
+  if(validate == -1) syscall_t_exit (thread_current () -> name, -1);
 
   filesys_lock_acquire ();
   struct file * file = filesys_open ((char *)args[1]);
