@@ -58,11 +58,11 @@ get_user (const uint8_t *uaddr)
 	return result;
 }
 
-/* Reads a byte at user virtual address UADDR.
+/* Reads a word at user virtual address UADDR.
 UADDR must be below PHYS_BASE.
-Returns the byte value if successful, -1 if a segfault occurred. */
+Returns the word value if successful, -1 if a segfault occurred. */
 static int
-get_user_word (const int *uaddr)
+get_word_user (const int *uaddr)
 {
   int result;
   if ((void *) uaddr >= PHYS_BASE)
@@ -70,9 +70,8 @@ get_user_word (const int *uaddr)
     if(DEBUG) printf ("Trying to access memory address: %p, which is kernel memory address\n", uaddr);
     return -1;
   }
-  asm ("movl $1f, %0; movzwl %1, %0; 1:"
+  asm ("movl $1f, %0; movl %1, %0; 1:"
     : "=&a" (result) : "m" (*uaddr));
-  if (DEBUG) printf("Result of get word is %d.\n", result);
   return result;
 }
 
@@ -163,8 +162,7 @@ syscall_init (void)
 static void
 syscall_handler (struct intr_frame *f)
 {
-  int syscall_number = get_safe((int *)(f -> esp));
-  get_user_word((int *)(f->esp));
+  int syscall_number = get_word_user((int *)(f -> esp));
   if(syscall_number < SYS_HALT || syscall_number > SYS_CLOSE){
     syscall_t_exit (thread_current () -> name, -1);
   }
@@ -184,16 +182,15 @@ static int *
 syscall_retrieve_args (struct intr_frame *f)
 {
   int * args = (int*) malloc(3);
-  int syscall_number = get_safe((int*)(f -> esp));
+  int syscall_number = get_word_user((int*)(f -> esp));
   int noa = syscall_noa[ syscall_number ];
 
   int i;
   for(i = 0; i <= noa; i++){
-    args[i] = get_user((uint8_t*)(f -> esp) + i * 4);
+    args[i] = get_word_user((int*)(f -> esp) + i);
     if(args[i] == -1){
       syscall_t_exit (thread_current () -> name, -1);
     }
-    //printf("%p %d\n", args[i]);
   }
 
   return args;
@@ -233,7 +230,9 @@ syscall_wait (int * args, struct intr_frame *f )
 static void
 syscall_create (int * args, struct intr_frame *f )
 {
-  if((char*)args[1] == NULL) syscall_t_exit (thread_current () -> name, -1);
+  uint8_t * file_name = (uint8_t *) args[1];
+  int get_status = get_user (file_name);
+  if(get_status == -1) syscall_t_exit (thread_current () -> name, -1);
 
   filesys_lock_acquire ();
   f->eax = filesys_create ((char*)args[1], args[2]);
