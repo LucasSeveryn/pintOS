@@ -387,7 +387,7 @@ thread_exit (void)
     hash_first(&e, &thread_current ()->files);
     while( hash_next(&e) )
       {
-        fh = hash_entry (hash_cur(&e), struct file_handle, hash_elem);
+        fh = hash_entry (hash_cur(&e), struct file_handle, elem);
         file_close (fh -> file);
       }
     //Destroy files table
@@ -834,14 +834,14 @@ uint32_t thread_stack_ofs = offsetof (struct thread, stack);
 
 unsigned
 file_hash(const struct hash_elem * el, void *aux UNUSED){
-  const struct file_handle *e = hash_entry (el, struct file_handle, hash_elem);
+  const struct file_handle *e = hash_entry (el, struct file_handle, elem);
   return hash_int (e->fd);
 }
 
 bool
 file_less(const struct hash_elem* a_, const struct hash_elem* b_, void * aux UNUSED){
-  const struct file_handle *a = hash_entry (a_, struct file_handle, hash_elem);
-  const struct file_handle *b = hash_entry (b_, struct file_handle, hash_elem);
+  const struct file_handle *a = hash_entry (a_, struct file_handle, elem);
+  const struct file_handle *b = hash_entry (b_, struct file_handle, elem);
     return a->fd < b->fd;
 }
 
@@ -854,10 +854,10 @@ thread_get_file(int fd){
 
   fh.fd = fd;
   if(t->files.initialized != HASH_INITIALIZED) return NULL;
-  struct hash_elem *he = hash_find (&t->files, &fh.hash_elem);
+  struct hash_elem *he = hash_find (&t->files, &fh.elem);
 
   if(he != NULL){
-    fh_found = hash_entry (he, struct file_handle, hash_elem);
+    fh_found = hash_entry (he, struct file_handle, elem);
     return fh_found;
   } else {
     return NULL;
@@ -873,7 +873,7 @@ thread_add_file(struct file * file){
   fh.fd = t->next_fd++;
   fh.file = file;
   if(t->files.initialized != HASH_INITIALIZED) hash_init (&t->files,  file_hash, file_less, NULL);
-  hash_insert (&t->files, &fh.hash_elem);
+  hash_insert (&t->files, &fh.elem);
 
   return fh.fd;
 }
@@ -885,7 +885,7 @@ thread_remove_file(int fd){
 
   if(t->files.initialized != HASH_INITIALIZED) return;
   fh.fd = fd;
-  hash_delete (&t->files, &fh.hash_elem);
+  hash_delete (&t->files, &fh.elem);
 }
 
 void
