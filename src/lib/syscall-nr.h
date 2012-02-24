@@ -6,7 +6,7 @@
 #define NOA 24
 
 /* System call numbers. */
-enum 
+enum
   {
     /* Tasks 2 and later. */
     SYS_HALT,                   /* Halt the operating system. */
