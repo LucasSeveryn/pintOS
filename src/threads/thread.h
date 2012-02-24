@@ -89,7 +89,7 @@ typedef int tid_t;
 struct file_handle{
   int fd;
   struct file * file;
-  struct hash_elem elem;
+  struct list_elem elem;
 };
 
 struct thread
@@ -97,7 +97,8 @@ struct thread
     /* Owned by thread.c. */
     tid_t tid;                          /* Thread identifier. */
     enum thread_status status;          /* Thread state. */
-    char name[16];                      /* Name (for debugging purposes). */
+    char name[16];
+    /*char * file_name;*/
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
     struct list_elem allelem;           /* List element for all threads list. */
@@ -122,13 +123,15 @@ struct thread
 
     int ret;
 
-    struct semaphore * wait;
+    struct semaphore * ret_saved;
+    struct semaphore * child_alive;
+    struct semaphore * child_loading;
 
     struct thread * parent;             /* parent of the thread */
     struct list_elem child;
     struct list children;               /* children of the thread */
 
-    struct hash files;                  /*  files opened by the process*/
+    struct list files;                  /*  files opened by the process*/
     int next_fd;
 #endif
 
@@ -177,7 +180,7 @@ int thread_get_load_avg (void);
 struct thread* get_thread_by_tid(tid_t);
 struct file_handle * thread_get_file(int);
 int thread_add_file(struct file *);
-void thread_remove_file(int);
+void thread_remove_file(struct file_handle * fh);
 
 void thread_add_child (struct thread *, tid_t);
 #endif /* threads/thread.h */

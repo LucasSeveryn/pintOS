@@ -151,6 +151,16 @@ page_fault (struct intr_frame *f)
   f->eip = (void (*) (void)) f->eax;
   f->eax = 0xffffffff;
 
+  thread_current () -> ret = -1;
+  printf ("%s: exit(%d)\n", thread_current () -> name, -1);
+  thread_exit ();
+
+  //asm volatile
+ //("pushl %[arg0]; pushl %[number]; int $0x30; addl $8, %%esp"
+  //   :  : [number] "i" (1),                                  
+   //   [arg0] "g" (-1)                                      
+   //  : "memory"); 
+
   /* To implement virtual memory, delete the rest of the function
      body, and replace it with code that brings in the page to
      which fault_addr refers. */
