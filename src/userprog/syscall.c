@@ -258,8 +258,12 @@ syscall_open (int * args, struct intr_frame *f )
   struct file * file = filesys_open ((char*)args[1]);
   filesys_lock_release ();
 
-  if(file == NULL) syscall_t_exit (thread_current () -> name, -1);
-  int fd = thread_add_file (file);
+  int fd;
+  if(file == NULL) {
+    fd = -1;
+  } else {
+    fd = thread_add_file (file);
+  }
 
   f->eax = fd;
 }
