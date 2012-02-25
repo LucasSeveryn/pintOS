@@ -227,13 +227,13 @@ syscall_exec (int * args, struct intr_frame *f)
 
   char validate = get_user((char*)args[1]);
   if(validate == -1) syscall_t_exit (thread_current () -> name, -1);
-  
+
   filesys_lock_acquire ();
-  
+
   tid_t id = process_execute ((char*)args[1]);
-  
+
   filesys_lock_release ();
-  
+
   f->eax = id;
 }
 
