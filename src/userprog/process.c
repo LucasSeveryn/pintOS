@@ -211,15 +211,7 @@ start_process (void *file_name_)
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
 int
-<<<<<<< HEAD
-<<<<<<< HEAD
 process_wait (tid_t child_tid)
-=======
-process_wait (tid_t child_tid UNUSED)
->>>>>>> spaces, and try to retrieve whole word at once from memory
-=======
-process_wait (tid_t child_tid)
->>>>>>> 7 tests left
 {
   struct semaphore * child_alive = malloc (sizeof (struct semaphore));
   struct semaphore * ret_saved = malloc (sizeof (struct semaphore));
