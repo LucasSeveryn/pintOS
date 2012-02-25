@@ -31,7 +31,7 @@ static bool load (const char *cmdline, void (**eip) (void), void **esp);
    thread id, or TID_ERROR if the thread cannot be created. */
 void
 process_init (){
-  
+
 }
 
 tid_t
@@ -68,7 +68,7 @@ process_execute (const char *file_name)
   tid = thread_create (exec_file_name, PRI_DEFAULT, start_process, fn_copy);
 
   sema_down (parent->child_loading);
-  
+
   if(file == NULL){
     free (parent->child_loading);
     return TID_ERROR;
@@ -107,7 +107,7 @@ start_process (void *file_name_)
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (exec_file_name, &if_.eip, &if_.esp);
 
-  if (success){ 
+  if (success){
     struct file * file = filesys_open (exec_file_name);
     thread_add_file (file);
     file_deny_write (file);

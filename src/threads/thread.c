@@ -271,7 +271,7 @@ thread_create (const char *name, int priority,
   #ifdef USERPROG
   thread_add_child (thread_current(), tid);
   #endif
-  
+
   /* Prepare thread for first run by initializing its stack.
      Do this atomically so intermediate values for the 'stack'
      member cannot be observed. */
@@ -380,13 +380,13 @@ void
 thread_exit (void)
 {
   struct thread * t = thread_current();
-  
+
   ASSERT (!intr_context ());
 
 #ifdef USERPROG
   if(t->child_alive != NULL) sema_up (t->child_alive);
   if(t->ret_saved != NULL) sema_down (t->ret_saved);
-  
+
   process_exit ();
   struct list_elem *e;
   struct file_handle * fh;
@@ -396,6 +396,7 @@ thread_exit (void)
   {
     e = list_pop_front (&t->files);
     fh = list_entry (e, struct file_handle, elem);
+    file_close (fh->file);
     free(fh);
   }
 #endif

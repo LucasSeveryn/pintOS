@@ -132,6 +132,7 @@ struct thread
     struct list children;               /* children of the thread */
 
     struct list files;                  /*  files opened by the process*/
+    struct file * exec_file;
     int next_fd;
 #endif
 
