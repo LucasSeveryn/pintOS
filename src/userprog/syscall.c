@@ -51,7 +51,7 @@ get_user (const uint8_t *uaddr)
 	if ((void *) uaddr >= PHYS_BASE)
 	{
 		if(DEBUG) printf ("Trying to access memory address: %p, which is kernel memory address\n", uaddr);
-		return -1;
+    syscall_t_exit (thread_current () -> name, -1);
 	}
 	asm ("movl $1f, %0; movzbl %1, %0; 1:"
 		: "=&a" (result) : "m" (*uaddr));
@@ -68,7 +68,7 @@ get_word_user (const int *uaddr)
   if ((void *) uaddr >= PHYS_BASE)
   {
     if(DEBUG) printf ("Trying to access memory address: %p, which is kernel memory address\n", uaddr);
-    return -1;
+    syscall_t_exit (thread_current () -> name, -1);
   }
   asm ("movl $1f, %0; movl %1, %0; 1:"
     : "=&a" (result) : "m" (*uaddr));
@@ -227,13 +227,13 @@ syscall_exec (int * args, struct intr_frame *f)
 
   char validate = get_user((char*)args[1]);
   if(validate == -1) syscall_t_exit (thread_current () -> name, -1);
-  
+
   filesys_lock_acquire ();
-  
+
   tid_t id = process_execute ((char*)args[1]);
-  
+
   filesys_lock_release ();
-  
+
   f->eax = id;
 }
 
@@ -316,11 +316,17 @@ syscall_read (int * args, struct intr_frame *f )
     //ERROR - we are trying to read from output :P
   } else {
     uint8_t * buffer = (uint8_t *) args[2];
-    char validate = get_user (buffer);
-    if(validate == -1) syscall_t_exit (thread_current () -> name, -2);
+    int validate = get_user (buffer);
+    if(validate == -1) {
+      f -> eax = -1;
+      return;
+    }
 
     struct file_handle * fh = thread_get_file (args[1]);
-    if( fh == NULL) syscall_t_exit (thread_current () -> name, -3);
+    if( fh == NULL) {
+      f -> eax = -1;
+      return;
+    }
 
     filesys_lock_acquire ();
     off_t written = file_read (fh->file, buffer, args[3]);
@@ -362,11 +368,17 @@ syscall_write (int * args, struct intr_frame *f)
     f -> eax = written;
   } else {
     uint8_t * buffer = (uint8_t *) args[2];
-    char validate = get_user (buffer);
-    if(validate == -1) syscall_t_exit (thread_current () -> name, -1);
+    int validate = get_user (buffer);
+    if(validate == -1) {
+      f -> eax = 0;
+      return;
+    }
 
     struct file_handle * fh = thread_get_file (args[1]);
-    if( fh == NULL) syscall_t_exit (thread_current () -> name, -1);
+    if( fh == NULL) {
+      f->eax = 0;
+      return;
+    }
 
     filesys_lock_acquire ();
     off_t written = file_write (fh->file, buffer, args[3]);
