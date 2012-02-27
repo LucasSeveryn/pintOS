@@ -382,6 +382,12 @@ thread_exit (void)
   ASSERT (!intr_context ());
 
 #ifdef USERPROG
+  if(t->parent != NULL){
+    struct return_status * return_status = malloc (sizeof (struct return_status));
+    return_status -> tid = t -> tid;
+    return_status -> return_code = t -> ret;
+    list_push_back (&t->parent->children_return, &return_status->elem);
+  }
   if(t->child_alive != NULL) sema_up (t->child_alive);
   if(t->ret_saved != NULL) sema_down (t->ret_saved);
   process_exit ();
@@ -693,8 +699,10 @@ init_thread (struct thread *t, const char *name, int priority)
   t->is_donated = false;
   list_init (&t->held_locks);
   #ifdef USERPROG
+  t->child_alive = NULL;
   list_init (&t->children);
   list_init (&t->files);
+  list_init (&t->children_return);
   t->next_fd = 2;
   #endif
   t->magic = THREAD_MAGIC;
@@ -852,10 +860,25 @@ thread_get_file(int fd){
     return NULL;
 }
 
+struct return_status *
+thread_get_child_status(int cid){
+  struct return_status * rs_found;
+  struct thread * t = thread_current();
+  struct list_elem *e;
+
+  for (e = list_begin (&t->children_return); e != list_end (&t->children_return); e = list_next (e))
+  {
+    rs_found = list_entry (e, struct return_status, elem);
+    if(rs_found -> tid == cid) return rs_found;
+  }
+
+    return NULL;
+}
+
 int
 thread_add_file(struct file * file){
-  struct file_handle * fh = malloc(sizeof(struct file_handle));
-  struct thread * t = thread_current();
+  struct file_handle * fh = malloc (sizeof (struct file_handle));
+  struct thread * t = thread_current ();
 
   fh->fd = t->next_fd++;
   fh->file = file;

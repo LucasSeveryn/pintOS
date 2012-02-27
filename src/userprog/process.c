@@ -216,7 +216,8 @@ process_wait (tid_t child_tid)
   struct semaphore * child_alive = malloc (sizeof (struct semaphore));
   struct semaphore * ret_saved = malloc (sizeof (struct semaphore));
   struct thread * child;
-  struct thread * parent = thread_current();
+  struct thread * parent = thread_current ();
+  struct return_status * return_status = thread_get_child_status (child_tid);
   struct list_elem *e;
 
   for (e = list_begin (&parent->children); e != list_end (&parent->children);
@@ -225,12 +226,19 @@ process_wait (tid_t child_tid)
       child = list_entry (e, struct thread, child);
       if(child->tid == child_tid) break;
     }
+  
+  if(child != NULL && child->child_alive != NULL && child->tid == child_tid) return -1;//we are already waiting for this thread
 
-  if(child == NULL||child->tid != child_tid) return -1; //thread with this tid is not a child of current thread
-  if(child->child_alive != NULL) return -1;//we are already waiting for this thread
+  if(return_status != NULL){
+    list_remove (&return_status->elem);
+    return return_status -> return_code;
+  }
 
-  sema_init(child_alive, 0);
-  sema_init(ret_saved, 0);
+  if(child != NULL && child->tid != child_tid) return -1; //thread with this tid is not a child of current thread
+
+
+  sema_init (child_alive, 0);
+  sema_init (ret_saved, 0);
   child->child_alive = child_alive;
   child->ret_saved = ret_saved;
 
@@ -239,6 +247,8 @@ process_wait (tid_t child_tid)
   if(child->status != THREAD_DYING) {
     sema_down (child_alive);
     ret = child -> ret;
+    return_status = thread_get_child_status (child_tid);
+    list_remove (&return_status->elem);
     sema_up (ret_saved);
     sema_down (child_alive);
   }
