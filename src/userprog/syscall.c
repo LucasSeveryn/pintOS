@@ -222,7 +222,6 @@ syscall_exit (int * args, struct intr_frame *f)
 static void
 syscall_exec (int * args, struct intr_frame *f)
 {
-
   struct thread * parent = thread_current();
 
   char validate = get_user((char*)args[1]);
@@ -233,6 +232,10 @@ syscall_exec (int * args, struct intr_frame *f)
   tid_t id = process_execute ((char*)args[1]);
 
   filesys_lock_release ();
+
+  //if(id==TID_ERROR){
+  //  syscall_t_exit (thread_current () -> name, -1);
+  //}
 
   f->eax = id;
 }

@@ -141,7 +141,6 @@ struct thread
     struct list children_return;        /* children statuses */
 
     struct list files;                  /*  files opened by the process*/
-    struct file * exec_file;
     int next_fd;
 #endif
 

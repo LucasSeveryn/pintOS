@@ -260,9 +260,9 @@ thread_create (const char *name, int priority,
 
   /* Allocate thread. */
   t = palloc_get_page (PAL_ZERO);
-  if (t == NULL)
+  if (t == NULL){
     return TID_ERROR;
-
+  }
   /* Initialize thread. */
   init_thread (t, name, priority);
   /*t->file_name = name;*/
@@ -393,6 +393,7 @@ thread_exit (void)
   process_exit ();
   struct list_elem *e;
   struct file_handle * fh;
+  struct return_status * rs;
 
   //Close open files
   while (!list_empty (&t->files))
@@ -400,7 +401,13 @@ thread_exit (void)
     e = list_pop_front (&t->files);
     fh = list_entry (e, struct file_handle, elem);
     file_close (fh->file);
-    free(fh);
+    free (fh);
+  }
+  while (!list_empty (&t->children_return))
+  {
+    e = list_pop_front (&t->children_return);
+    rs = list_entry (e, struct return_status, elem);
+    free (rs);
   }
 #endif
 
@@ -698,6 +705,7 @@ init_thread (struct thread *t, const char *name, int priority)
 
   t->is_donated = false;
   list_init (&t->held_locks);
+  t->ret = 0;
   #ifdef USERPROG
   t->child_alive = NULL;
   list_init (&t->children);

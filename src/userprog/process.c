@@ -8,6 +8,7 @@
 #include "userprog/gdt.h"
 #include "userprog/pagedir.h"
 #include "userprog/tss.h"
+#include "userprog/syscall.h"
 #include "filesys/directory.h"
 #include "filesys/file.h"
 #include "filesys/filesys.h"
@@ -58,6 +59,7 @@ process_execute (const char *file_name)
     free (parent->child_loading);
     return TID_ERROR;
   }
+
   strlcpy (fn_exec_copy, file_name, PGSIZE);
 
   char *exec_file_name = strtok_r (fn_exec_copy, " ", &rest);
@@ -66,8 +68,9 @@ process_execute (const char *file_name)
 
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (exec_file_name, PRI_DEFAULT, start_process, fn_copy);
+  palloc_free_page (fn_exec_copy);
 
-  sema_down (parent->child_loading);
+  if(tid != TID_ERROR) sema_down (parent->child_loading);
 
   if(file == NULL){
     free (parent->child_loading);
@@ -77,6 +80,12 @@ process_execute (const char *file_name)
   if (tid == TID_ERROR) {
     palloc_free_page (fn_copy);
     palloc_free_page (fn_exec_copy);
+  }
+
+  struct return_status * child_status = thread_get_child_status (tid); 
+  if(child_status != NULL && child_status -> tid == tid &&  child_status -> return_code == -1 ){
+    free (parent->child_loading);
+    return TID_ERROR;
   }
 
   free (parent->child_loading);
@@ -90,12 +99,13 @@ start_process (void *file_name_)
 {
   char *file_name = file_name_;
   struct intr_frame if_;
+  struct thread * cur = thread_current ();
   bool success;
   char *rest;
   char *token;
 
   int arguments_length = strlen (file_name) + 1;
-  if(DEBUG)printf("Length of command line arguments %d.\n", arguments_length);
+  if(DEBUG)printf ("Length of command line arguments %d.\n", arguments_length);
 
   /* Token gains the filename value */
   char *exec_file_name = strtok_r (file_name, " ", &rest);
@@ -113,11 +123,15 @@ start_process (void *file_name_)
     file_deny_write (file);
   }
 
-  sema_up (thread_current()->parent->child_loading);
-
   /* If load failed, quit. */
-  if (!success)
+  if (!success){
+    cur->ret = -1;
+    printf ("%s: exit(%d)\n", cur->name, -1);
+    sema_up (cur->parent->child_loading);
     thread_exit ();
+  }
+
+  sema_up (cur->parent->child_loading);
 
   /* Array reserved for arguments */
   char **args = (char **) malloc (arguments_length * sizeof(char));
@@ -213,8 +227,8 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid)
 {
-  struct semaphore * child_alive = malloc (sizeof (struct semaphore));
-  struct semaphore * ret_saved = malloc (sizeof (struct semaphore));
+  struct semaphore * child_alive;
+  struct semaphore * ret_saved;
   struct thread * child;
   struct thread * parent = thread_current ();
   struct return_status * return_status = thread_get_child_status (child_tid);
@@ -227,8 +241,10 @@ process_wait (tid_t child_tid)
       if(child->tid == child_tid) break;
     }
   
-  if(child != NULL && child->child_alive != NULL && child->tid == child_tid) return -1;//we are already waiting for this thread
-
+  if(child != NULL && child->child_alive != NULL && child->tid == child_tid) {
+    return -1;//we are already waiting for this thread
+  }
+  
   if(return_status != NULL){
     list_remove (&return_status->elem);
     return return_status -> return_code;
@@ -236,7 +252,8 @@ process_wait (tid_t child_tid)
 
   if(child != NULL && child->tid != child_tid) return -1; //thread with this tid is not a child of current thread
 
-
+  child_alive = malloc (sizeof (struct semaphore));
+  ret_saved = malloc (sizeof (struct semaphore));
   sema_init (child_alive, 0);
   sema_init (ret_saved, 0);
   child->child_alive = child_alive;
@@ -252,6 +269,9 @@ process_wait (tid_t child_tid)
     sema_up (ret_saved);
     sema_down (child_alive);
   }
+
+  free (child_alive);
+  free (ret_saved);
   return ret;
 }
 
