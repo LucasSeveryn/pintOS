@@ -88,15 +88,15 @@ typedef int tid_t;
 
 struct file_handle
   {
-    int fd;
-    struct file * file;
+    int fd;                             /* file descriptor */
+    struct file * file;                 /* pointer to the file */
     struct list_elem elem;
   };
 
 struct return_status
   {
-    int tid;
-    int return_code;
+    int tid;                            /* thread id */
+    int return_code;                    /* return code of the thread */
     struct list_elem elem;
   }; 
 
@@ -129,19 +129,17 @@ struct thread
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
 
-    int ret;
-
-    struct semaphore * ret_saved;
-    struct semaphore * child_alive;
-    struct semaphore * child_loading;
+    int ret;                            /* return status of the process */
+    struct semaphore * child_alive;     /* smaphore indicating that child have not died yet */
+    struct semaphore * child_loading;   /* semaphore indicating if the child is still loading*/
 
     struct thread * parent;             /* parent of the thread */
-    struct list_elem child;
+    struct list_elem child;             /* element of parent's list of children*/
     struct list children;               /* children of the thread */
     struct list children_return;        /* children statuses */
 
     struct list files;                  /*  files opened by the process*/
-    int next_fd;
+    int next_fd;                        /*  descripton for next open file*/
 #endif
 
     /* Owned by thread.c. */
@@ -192,4 +190,5 @@ int thread_add_file(struct file *);
 void thread_remove_file(struct file_handle * fh);
 
 void thread_add_child (struct thread *, tid_t);
+struct return_status * thread_get_child_status (int);
 #endif /* threads/thread.h */

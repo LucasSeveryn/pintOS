@@ -22,7 +22,6 @@
 
 bool DEBUG = false;
 
-static struct semaphore child_loading;
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 
@@ -30,11 +29,6 @@ static bool load (const char *cmdline, void (**eip) (void), void **esp);
    FILENAME.  The new thread may be scheduled (and may even exit)
    before process_execute() returns.  Returns the new process's
    thread id, or TID_ERROR if the thread cannot be created. */
-void
-process_init (){
-
-}
-
 tid_t
 process_execute (const char *file_name)
 {
@@ -228,7 +222,6 @@ int
 process_wait (tid_t child_tid)
 {
   struct semaphore * child_alive;
-  struct semaphore * ret_saved;
   struct thread * child;
   struct thread * parent = thread_current ();
   struct return_status * return_status = thread_get_child_status (child_tid);
@@ -253,25 +246,20 @@ process_wait (tid_t child_tid)
   if(child != NULL && child->tid != child_tid) return -1; //thread with this tid is not a child of current thread
 
   child_alive = malloc (sizeof (struct semaphore));
-  ret_saved = malloc (sizeof (struct semaphore));
   sema_init (child_alive, 0);
-  sema_init (ret_saved, 0);
   child->child_alive = child_alive;
-  child->ret_saved = ret_saved;
 
   int ret = -1;
 
   if(child->status != THREAD_DYING) {
     sema_down (child_alive);
-    ret = child -> ret;
     return_status = thread_get_child_status (child_tid);
+    ret = return_status -> return_code;
     list_remove (&return_status->elem);
-    sema_up (ret_saved);
     sema_down (child_alive);
   }
 
   free (child_alive);
-  free (ret_saved);
   return ret;
 }
 

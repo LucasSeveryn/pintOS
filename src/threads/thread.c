@@ -388,8 +388,9 @@ thread_exit (void)
     return_status -> return_code = t -> ret;
     list_push_back (&t->parent->children_return, &return_status->elem);
   }
+
   if(t->child_alive != NULL) sema_up (t->child_alive);
-  if(t->ret_saved != NULL) sema_down (t->ret_saved);
+
   process_exit ();
   struct list_elem *e;
   struct file_handle * fh;

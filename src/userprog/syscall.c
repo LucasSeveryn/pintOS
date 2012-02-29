@@ -12,7 +12,7 @@
 #include "devices/input.h"
 #include <kernel/stdio.h>
 
-void (*syscall_functions[NOA]) (int* , struct intr_frame *);
+
 
 #define DEBUG false
 
@@ -38,8 +38,10 @@ static void syscall_seek (int *, struct intr_frame *);
 static void syscall_tell (int *, struct intr_frame *);
 static void syscall_close (int *, struct intr_frame *);
 
-static struct lock filesys_lock;
-static int syscall_noa[NOA];
+static void (*syscall_functions[NOA]) (int* , struct intr_frame *); /* Array of syscall functions */
+static struct lock filesys_lock;  /* File system lock */
+
+static int syscall_noa[NOA];  /* Array with number of arguments for every syscall */
 
 /* Reads a byte at user virtual address UADDR.
 UADDR must be below PHYS_BASE.
@@ -90,25 +92,6 @@ put_user (uint8_t *udst, uint8_t byte)
 	asm ("movl $1f, %0; movb %b2, %1; 1:"
 		: "=&a" (error_code), "=m" (*udst) : "q" (byte));
 	return error_code != -1;
-}
-
-static int
-get_safe(int * addr){
-  int res = 0;
-  int tmp;
-
-  int i;
-  for( i = 3; i >= 0; i-- ){
-    tmp = get_user((uint8_t*)(addr) + i);
-    if(DEBUG) printf("Byte %d - value %d | ", i, tmp);
-    if(tmp == -1){
-      syscall_t_exit (thread_current () -> name, -1);
-    }
-    res |= tmp;
-    if(i != 0) res <<= 8;
-  }
-  if(DEBUG) printf(" Result: %d.\n", res);
-  return res;
 }
 
 void
@@ -162,7 +145,7 @@ syscall_init (void)
 static void
 syscall_handler (struct intr_frame *f)
 {
-  if( f->eax == -1 ){
+  if( (int)f->eax == -1 ){
     syscall_t_exit (thread_current () -> name, -1);
   }
 
@@ -176,6 +159,7 @@ syscall_handler (struct intr_frame *f)
   free (args);
 }
 
+/* Function which wrapps everything that has to be done when calling exit */
 static void
 syscall_t_exit (char * p_name, int status)
 {
@@ -184,6 +168,7 @@ syscall_t_exit (char * p_name, int status)
   thread_exit ();
 }
 
+/* Returns array of arguments retrieved from the frame */
 static int *
 syscall_retrieve_args (struct intr_frame *f)
 {
@@ -202,16 +187,18 @@ syscall_retrieve_args (struct intr_frame *f)
   return args;
 }
 
+/* halt() - Stops the system end terminates */
 static void
 syscall_halt (int * args UNUSED, struct intr_frame *f UNUSED)
 {
   shutdown_power_off ();
 }
 
+/* exit( int ) - Terminates the current program and returns its status */
 static void
 syscall_exit (int * args, struct intr_frame *f)
 {
-  if( f->eax == -1 ){
+  if( (int)f->eax == -1 ){
     args[1] = -1;
   }
 
@@ -219,12 +206,12 @@ syscall_exit (int * args, struct intr_frame *f)
   syscall_t_exit (thread_current () -> name, args[1]);
 }
 
+/* pid_t exex( const char * ) - Runs the executable whose name is given as the parameter */
 static void
 syscall_exec (int * args, struct intr_frame *f)
 {
-  struct thread * parent = thread_current();
 
-  char validate = get_user((char*)args[1]);
+  char validate = get_user((uint8_t*)args[1]);
   if(validate == -1) syscall_t_exit (thread_current () -> name, -1);
 
   filesys_lock_acquire ();
@@ -233,20 +220,18 @@ syscall_exec (int * args, struct intr_frame *f)
 
   filesys_lock_release ();
 
-  //if(id==TID_ERROR){
-  //  syscall_t_exit (thread_current () -> name, -1);
-  //}
-
   f->eax = id;
 }
 
+/* int wait( pid_t ) - waits for the child process with tid equals to the parameter
+ * to terminate, and returns its status */
 static void
 syscall_wait (int * args, struct intr_frame *f )
 {
   f->eax = process_wait (args[1]);
 }
 
-
+/* bool create( const char *, unsigned ) - create a new file of given size */
 static void
 syscall_create (int * args, struct intr_frame *f )
 {
@@ -258,6 +243,7 @@ syscall_create (int * args, struct intr_frame *f )
   filesys_lock_release ();
 }
 
+/* bool remove( const char * ) - Deletes a file */
 static void
 syscall_remove (int * args, struct intr_frame *f )
 {
@@ -269,6 +255,7 @@ syscall_remove (int * args, struct intr_frame *f )
   filesys_lock_release ();
 }
 
+/* bool open( const char * ) - Opens a file */
 static void
 syscall_open (int * args, struct intr_frame *f )
 {
@@ -289,6 +276,7 @@ syscall_open (int * args, struct intr_frame *f )
   f->eax = fd;
 }
 
+/* int filesize( int ) - Returns the size of a file */
 static void
 syscall_filesize (int * args, struct intr_frame *f )
 {
@@ -298,7 +286,7 @@ syscall_filesize (int * args, struct intr_frame *f )
   f->eax = file_length (fh->file);
 }
 
-
+/* int read( int, void *, unsigned ) - Reads given number of bytes from the file into the buffer */
 static void
 syscall_read (int * args, struct intr_frame *f )
 {
@@ -339,6 +327,7 @@ syscall_read (int * args, struct intr_frame *f )
   }
 }
 
+/* int write( int, void *, unsigned ) - Writes given number of bytes to the file from the buffer */
 static void
 syscall_write (int * args, struct intr_frame *f)
 {
@@ -391,6 +380,7 @@ syscall_write (int * args, struct intr_frame *f)
   }
 }
 
+/* void seek( int, unsigned ) - Changes the next byte to be read or written from the file to the position */
 static void
 syscall_seek (int * args, struct intr_frame *f UNUSED)
 {
@@ -402,6 +392,7 @@ syscall_seek (int * args, struct intr_frame *f UNUSED)
   filesys_lock_release ();
 }
 
+/* unsigned tell( int ) - Returns the position of the next byte to be read or written */
 static void
 syscall_tell (int * args, struct intr_frame *f){
   struct file_handle * fh = thread_get_file (args[1]);
@@ -413,6 +404,7 @@ syscall_tell (int * args, struct intr_frame *f){
   filesys_lock_release ();
 }
 
+/* void close( int ) - Closes a file with the given descriptor */
 static void
 syscall_close (int * args, struct intr_frame *f UNUSED)
 {
