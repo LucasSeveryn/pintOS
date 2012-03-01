@@ -62,6 +62,7 @@ process_execute (const char *file_name)
 
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (exec_file_name, PRI_DEFAULT, start_process, fn_copy);
+
   palloc_free_page (fn_exec_copy);
 
   if(tid != TID_ERROR) sema_down (parent->child_loading);
@@ -76,7 +77,7 @@ process_execute (const char *file_name)
     palloc_free_page (fn_exec_copy);
   }
 
-  struct return_status * child_status = thread_get_child_status (tid); 
+  struct return_status * child_status = thread_get_child_status (tid);
   if(child_status != NULL && child_status -> tid == tid &&  child_status -> return_code == -1 ){
     free (parent->child_loading);
     return TID_ERROR;
@@ -99,7 +100,6 @@ start_process (void *file_name_)
   char *token;
 
   int arguments_length = strlen (file_name) + 1;
-  if(DEBUG)printf ("Length of command line arguments %d.\n", arguments_length);
 
   /* Token gains the filename value */
   char *exec_file_name = strtok_r (file_name, " ", &rest);
@@ -111,14 +111,13 @@ start_process (void *file_name_)
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (exec_file_name, &if_.eip, &if_.esp);
 
-  if (success){
+  if (success)
+  {
     struct file * file = filesys_open (exec_file_name);
     thread_add_file (file);
     file_deny_write (file);
-  }
-
-  /* If load failed, quit. */
-  if (!success){
+  } else {
+    /* If load failed, quit. */
     cur->ret = -1;
     printf ("%s: exit(%d)\n", cur->name, -1);
     sema_up (cur->parent->child_loading);
@@ -143,58 +142,47 @@ start_process (void *file_name_)
 
   while((token = strtok_r(NULL, " ", &rest))) {
     arguments_length += strlen (token) + 1;
-    args[argc++] = token;
+    args[argc++]     = token;
   }
 
-  if(DEBUG)printf("Actual length of command line arguments %d.\n", arguments_length);
-
   int **addresses = (int **) malloc (argc * sizeof(int *));
-
-  if(DEBUG)printf("argc %d\n", argc);
 
   int i;
   for (i = argc - 1; i >= 0; i--)
   {
     int arg_length = strlen(args[i])+1;
-    if_.esp -= arg_length;
-    addresses[i] = if_.esp;
-    memcpy ( if_.esp, args[i], arg_length);
-    if(DEBUG)printf("Current address of esp %p and its value %s\n", if_.esp, (char *)if_.esp);
+    if_.esp       -= arg_length;
+    addresses[i]   = if_.esp;
+    memcpy (if_.esp, args[i], arg_length);
   }
 
   int word_align_offset = arguments_length % 4;
+
   if_.esp -= word_align_offset != 0 ? 4 - word_align_offset : 0 ;
-  if(DEBUG)printf("word alignment\n");
-  if(DEBUG)printf("Current address of esp %p \n",if_.esp);
 
   /* push 0 sentinel argument */
-  if_.esp -= 4;
-  *(int *)if_.esp = 0;
-  if(DEBUG)printf("Current address of esp %p and its value %d\n", if_.esp, *(int *)if_.esp);
+  if_.esp         -= 4;
+  *(int *) if_.esp = 0;
 
   for (i = argc - 1; i >= 0; i--)
   {
-    if_.esp -= 4;
-    *(void **)(if_.esp) = addresses[i];
-    if(DEBUG)printf("Current address of esp %p and its value %p\n", if_.esp, *(char **)if_.esp);
+    if_.esp             -= 4;
+    *(void **) (if_.esp) = addresses[i];
   }
 
   /* adding argv */
-  if_.esp-=4;
-  *(char **)if_.esp = if_.esp + 4;
-  if(DEBUG)printf("Current address of esp %p and its value %p\n", if_.esp, *(char **)if_.esp);
+  if_.esp           -= 4;
+  *(char **) if_.esp = if_.esp + 4;
 
     /* adding argc */
-  if_.esp-=4;
-  *(int *)if_.esp = argc;
-  if(DEBUG)printf("Current address of esp %p and its value %d\n", if_.esp, *(int *)if_.esp);
+  if_.esp         -= 4;
+  *(int *) if_.esp = argc;
 
     /* adding fake return address */
-  if_.esp-=4;
-  *(int *)if_.esp = 0;
+  if_.esp         -= 4;
+  *(int *) if_.esp = 0;
 
-  if(DEBUG) printf("Current address of esp %p and its value %d\n", if_.esp, *(int *)if_.esp);
-
+  /* Deallocate memory */
   free (addresses);
   free (args);
   palloc_free_page (file_name);
@@ -221,10 +209,10 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid)
 {
-  struct semaphore * child_alive;
-  struct thread * child;
-  struct thread * parent = thread_current ();
-  struct return_status * return_status = thread_get_child_status (child_tid);
+  struct semaphore *child_alive;
+  struct thread *child;
+  struct thread *parent = thread_current ();
+  struct return_status *return_status = thread_get_child_status (child_tid);
   struct list_elem *e;
 
   for (e = list_begin (&parent->children); e != list_end (&parent->children);
@@ -233,17 +221,18 @@ process_wait (tid_t child_tid)
       child = list_entry (e, struct thread, child);
       if(child->tid == child_tid) break;
     }
-  
+
   if(child != NULL && child->child_alive != NULL && child->tid == child_tid) {
     return -1;//we are already waiting for this thread
   }
-  
+
   if(return_status != NULL){
     list_remove (&return_status->elem);
     return return_status -> return_code;
   }
 
-  if(child != NULL && child->tid != child_tid) return -1; //thread with this tid is not a child of current thread
+  //thread with this tid is not a child of current thread
+  if(child != NULL && child->tid != child_tid) return -1;
 
   child_alive = malloc (sizeof (struct semaphore));
   sema_init (child_alive, 0);

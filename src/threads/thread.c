@@ -25,7 +25,6 @@
 
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
-//static struct list ready_list;
 static struct priority_scheduler ready_ps;
 
 /* List of all processes.  Processes are added to this list
@@ -99,7 +98,6 @@ thread_init (void)
 
   lock_init (&tid_lock);
   ps_init (&ready_ps);
-  //list_init (&ready_list);
   list_init (&all_list);
 
   load_avg = 0;
@@ -170,7 +168,7 @@ thread_tick (void)
     bool woken_up = true;
     struct thread *thread_to_wake = list_entry (e, struct thread, elem);
     woken_up = thread_wakeup( thread_to_wake, NULL);
-    if( ! woken_up ){
+    if( !woken_up ){
       struct list_elem *woken_up_elem;
 
       for (woken_up_elem = list_begin (&ready_ps.sleeping_list); woken_up_elem != e;
@@ -189,9 +187,10 @@ thread_tick (void)
   /* Actually moves threads from sleeping queue to ready queue */
   if (e != list_begin (&ready_ps.sleeping_list))
   {
-    struct list_elem *woken_elem;
-    e = list_prev (e);
-    while(woken_elem != e)
+    struct list_elem *woken_elem = NULL;
+
+    struct list_elem *pre_e = list_prev (e);
+    while(woken_elem != pre_e)
     {
       woken_elem = list_pop_front (&ready_ps.sleeping_list);
       ps_push( &ready_ps, list_entry (woken_elem, struct thread, elem));
@@ -404,6 +403,7 @@ thread_exit (void)
     file_close (fh->file);
     free (fh);
   }
+
   while (!list_empty (&t->children_return))
   {
     e = list_pop_front (&t->children_return);
@@ -556,10 +556,13 @@ thread_set_priority (int new_priority)
   intr_set_level (old_level);
 
   if (!ps_empty (&ready_ps))
+  {
     th = ps_pull (&ready_ps);
-
-  if ( !ps_empty (&ready_ps) && th->priority > new_priority )
-	  thread_yield ();
+    if (th->priority > new_priority)
+    {
+        thread_yield();
+    }
+  }
 }
 
 /* Returns the current thread's priority. */
@@ -582,10 +585,13 @@ thread_set_nice (int new_nice)
   t -> nice = new_nice;
   thread_recalculate_priority( t, NULL);
   if (!ps_empty (&ready_ps))
+  {
     th = ps_pull (&ready_ps);
-
-  if ( !ps_empty (&ready_ps) && th->priority > t->priority )
-    thread_yield ();
+    if (th->priority > t->priority)
+    {
+        thread_yield();
+    }
+  }
   intr_set_level (old_level);
 }
 

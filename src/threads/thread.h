@@ -98,7 +98,7 @@ struct return_status
     int tid;                            /* thread id */
     int return_code;                    /* return code of the thread */
     struct list_elem elem;
-  }; 
+  };
 
 struct thread
   {
