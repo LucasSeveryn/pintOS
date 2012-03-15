@@ -1,0 +1,43 @@
+{
+    "folders":
+    [
+        {
+            "path": "threads",
+            "name": "Scheduling",
+            "folder_exclude_patterns": ["build"]
+        },
+        {
+            "path": "filesys",
+            "name": "Filesystem",
+            "folder_exclude_patterns": ["build"]
+        },
+        {
+            "path": "userprog",
+            "name": "User Programs",
+            "folder_exclude_patterns": ["build"]
+        },
+        {
+            "path": "vm",
+            "name": "Virtual Memory",
+            "folder_exclude_patterns": ["build"]
+        },
+        {
+            "path": "lib",
+            "name": "C stdlib",
+            "folder_exclude_patterns": ["build"]
+        },
+        {
+            "path": "tests",
+            "name": "Tests",
+            "folder_exclude_patterns": ["build"]
+        }
+    ],
+    "build_systems":
+    [
+        {
+            "name": "Make Pintos",
+            "cmd": ["make"],
+            "working_dir": "${file_path}"
+        }
+    ]
+}
