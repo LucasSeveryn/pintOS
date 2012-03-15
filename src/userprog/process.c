@@ -51,6 +51,7 @@ process_execute (const char *file_name)
 
   fn_exec_copy = palloc_get_page (0);
   if (fn_exec_copy == NULL){
+    palloc_free_page (fn_copy);
     free (parent->child_loading);
     return TID_ERROR;
   }
@@ -58,8 +59,7 @@ process_execute (const char *file_name)
   strlcpy (fn_exec_copy, file_name, PGSIZE);
 
   char *exec_file_name = strtok_r (fn_exec_copy, " ", &rest);
-
-  struct file * file=  filesys_open (exec_file_name);
+  struct file * file   = filesys_open (exec_file_name);
 
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (exec_file_name, PRI_DEFAULT, start_process, fn_copy);
@@ -75,7 +75,6 @@ process_execute (const char *file_name)
 
   if (tid == TID_ERROR) {
     palloc_free_page (fn_copy);
-    palloc_free_page (fn_exec_copy);
   }
 
   struct return_status * child_status = thread_get_child_status (tid);
