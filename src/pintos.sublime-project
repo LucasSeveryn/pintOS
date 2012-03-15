@@ -7,6 +7,15 @@
             "folder_exclude_patterns": ["build"]
         },
         {
+            "path": "devices",
+            "name": "IO code",
+            "folder_exclude_patterns": ["build"]
+        },        {
+            "path": "examples",
+            "name": "Sample programs",
+            "folder_exclude_patterns": ["build"]
+        },
+        {
             "path": "filesys",
             "name": "Filesystem",
             "folder_exclude_patterns": ["build"]
