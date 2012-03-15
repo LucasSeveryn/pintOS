@@ -28,6 +28,7 @@
 #include "userprog/gdt.h"
 #include "userprog/syscall.h"
 #include "userprog/tss.h"
+#include "vm/frame.h"
 #else
 #include "tests/threads/tests.h"
 #endif
@@ -113,6 +114,7 @@ main (void)
 #ifdef USERPROG
   exception_init ();
   syscall_init ();
+  frame_init();
 #endif
 
   /* Start thread scheduler and enable interrupts. */
