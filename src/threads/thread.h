@@ -128,7 +128,6 @@ struct thread
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
-    struct hash *frametable;            /* Frame table */
 
     int ret;                            /* return status of the process */
     struct semaphore * child_alive;     /* smaphore indicating that child have not died yet */
