@@ -122,7 +122,7 @@ get_class( uint32_t * pd, const void * page ){
 
 void 
 page_dump( uint32_t * pd, void * page, struct frame * frame ){
-	bool dirty = pagedir_is_dirty ( pd, page );
+	/*bool dirty = pagedir_is_dirty ( pd, page );
 
 	if( dirty ){
 		if( write_buffer -> isFull() ){
@@ -134,6 +134,7 @@ page_dump( uint32_t * pd, void * page, struct frame * frame ){
 
 	pagedir_set_accessed ( pd, page, false );
 	pagedir_set_dirty ( pd, page, false );
+*/
 }
 
 void *
