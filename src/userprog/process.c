@@ -38,7 +38,7 @@ process_execute (const char *file_name)
   char *rest;
   tid_t tid;
   struct thread * parent = thread_current();
-  parent->child_loading = malloc (sizeof (struct semaphore));
+  parent->child_loading = (struct semaphore *) malloc (sizeof (struct semaphore));
   sema_init (parent->child_loading, 0);
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
@@ -59,21 +59,24 @@ process_execute (const char *file_name)
   strlcpy (fn_exec_copy, file_name, PGSIZE);
 
   char *exec_file_name = strtok_r (fn_exec_copy, " ", &rest);
-  struct file * file   = filesys_open (exec_file_name);
+
+  struct file * file = filesys_open (exec_file_name);
+
+  if(file == NULL){
+    palloc_free_page (fn_exec_copy);
+    palloc_free_page (fn_copy);
+    free (parent->child_loading);
+    return TID_ERROR;
+  }
 
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (exec_file_name, PRI_DEFAULT, start_process, fn_copy);
 
   palloc_free_page (fn_exec_copy);
 
-  if(tid != TID_ERROR) sema_down (parent->child_loading);
-
-  if(file == NULL){
-    free (parent->child_loading);
-    return TID_ERROR;
-  }
-
-  if (tid == TID_ERROR) {
+  if(tid != TID_ERROR) {
+   sema_down (parent->child_loading);
+  } else {
     palloc_free_page (fn_copy);
   }
 
@@ -234,7 +237,7 @@ process_wait (tid_t child_tid)
   //thread with this tid is not a child of current thread
   if(child != NULL && child->tid != child_tid) return -1;
 
-  child_alive = malloc (sizeof (struct semaphore));
+  child_alive = (struct semaphore *) malloc (sizeof (struct semaphore));
   sema_init (child_alive, 0);
   child->child_alive = child_alive;
 

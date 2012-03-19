@@ -418,7 +418,7 @@ thread_exit (void)
   intr_disable ();
 
   list_remove (&t->allelem);
-  list_remove(&t->child);
+  list_remove (&t->child);
   thread_current ()->status = THREAD_DYING;
   schedule ();
   NOT_REACHED ();

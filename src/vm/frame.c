@@ -6,9 +6,9 @@
 #include "threads/thread.h"
 #include "userprog/pagedir.h"
 
-static struct hash frames; 
+static struct hash frames;
 static struct lock frames_lock;
-static 
+static
 
 void lock_frames (void);
 void unlock_frames (void);
@@ -25,16 +25,16 @@ void unlock_frames (){
 	lock_release (&frames_lock);
 }
 
-void 
+void
 frame_init (){
 	hash_init (&frames, frame_hash, frame_less, NULL);
 	lock_init (&frames_lock);
 }
 
-void * 
+void *
 frame_get (void * upage, bool zero){
 	void * kpage = palloc_get_page ( PAL_USER | (zero ? PAL_ZERO : 0) );
-	
+
 	/* There is no more free memory, we need to free some */
 	if( kpage == NULL ) {
 		kpage = evict( upage, thread_current() );
@@ -46,16 +46,16 @@ frame_get (void * upage, bool zero){
 		frame -> addr = kpage;
 		frame -> upage = upage;
 		frame -> thread = thread_current ();
-		
+
 		lock_frames();
 		hash_insert (&frames, &frame -> hash_elem);
 		unlock_frames();
-	} 
+	}
 
 	return kpage;
-}	
+}
 
-bool 
+bool
 frame_free (void * addr){
 	struct frame * frame;
 	struct hash_elem * found_frame;
@@ -65,14 +65,14 @@ frame_free (void * addr){
 	found_frame = hash_find(&frames, &frame_elem.hash_elem);
 	if( found_frame != NULL ){
 		frame = hash_entry (found_frame, struct frame, hash_elem);
-		
+
 		lock_frames();
 		palloc_free_page (frame->addr);
 		hash_delete ( &frames, &frame->hash_elem );
 		free (frame->addr);
 		unlock_frames();
 
-		
+
 		return true;
 	} else {
 		return false;
@@ -80,7 +80,7 @@ frame_free (void * addr){
 	}
 }
 
-struct frame * 
+struct frame *
 frame_find (void * addr){
 	struct frame * frame;
 	struct hash_elem * found_frame;
@@ -120,21 +120,21 @@ get_class( uint32_t * pd, const void * page ){
 	return (accessed) ? (( dirty ) ? 4 : 2) : (( dirty ) ? 3 : 1);
 }
 
-void 
+void
 page_dump( uint32_t * pd, void * page, struct frame * frame ){
 	/*bool dirty = pagedir_is_dirty ( pd, page );
 
 	if( dirty ){
 		if( write_buffer -> isFull() ){
-			write_buffer -> forceWrite();
-		} 
+			PANIC("WTF HAS JUST HAPPENED?!");
+			//write_buffer -> forceWrite();
+		}
 
 		write_buffer -> add( pd, page );
 	}
 
 	pagedir_set_accessed ( pd, page, false );
-	pagedir_set_dirty ( pd, page, false );
-*/
+	pagedir_set_dirty ( pd, page, false );*/
 }
 
 void *
