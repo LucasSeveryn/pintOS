@@ -162,14 +162,14 @@ page_fault (struct intr_frame *f)
     syscall_t_exit (t->name, -1);
 
   void *ret_page = pagedir_get_page(t->pagedir, fault_addr);
-  printf("faulted address: %p\n supp info: %p\n", fault_addr, ret_page);
+  //printf("faulted address: %p\n supp info: %p\n", fault_addr, ret_page);
   void *esp = f->cs == SEL_KCSEG ? t->esp : f->esp;
   bool stack_access = is_stack_access (esp, fault_addr);
   if (ret_page == NULL && !stack_access)
   {
     f->eip = (void (*) (void)) f->eax;
     f->eax = 0xffffffff;
-    syscall_t_exit (t->name, -122);
+    syscall_t_exit (t->name, -1);
   }
 
   bool writable = true;
