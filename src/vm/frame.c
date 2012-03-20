@@ -141,7 +141,7 @@ page_dump( uint32_t * pd, void * upage, struct frame * frame ){
 		suppl_page = new_file_page(frame->origin->source_file, frame->origin->offset, frame->origin->zero_after, frame->origin->writable, FILE);
 	} else {
 		//We are failing here. frame->origin = 0 :/
-		suppl_page = new_file_page(frame->origin->source_file, frame->origin->offset, frame->origin->zero_after, frame->origin->writable, FILE);	
+		suppl_page = new_zero_page();
 	}
 
 	pagedir_clear_page ( pd, upage );

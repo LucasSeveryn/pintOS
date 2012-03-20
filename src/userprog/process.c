@@ -576,7 +576,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       } else {
         new_page = new_file_page(file, current_ofs, page_read_bytes, writable, EXEC);
       }
-      printf("allocating address %p to address: %p\n", upage, new_page);
+      //printf("allocating address %p to address: %p\n", upage, new_page);
       /* Add the page to the process's address space. */
       if (!install_page_suppl (upage, new_page))
         {
