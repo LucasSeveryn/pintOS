@@ -158,27 +158,32 @@ page_fault (struct intr_frame *f)
 
   void * fault_page = (void *) (PTE_ADDR & (uint32_t) fault_addr);
   struct thread *t = thread_current ();
+  if (!is_user_vaddr(fault_addr))
+    syscall_t_exit (t->name, -1);
 
   void *ret_page = pagedir_get_page(t->pagedir, fault_addr);
+  printf("faulted address: %p\n supp info: %p\n", fault_addr, ret_page);
   void *esp = f->cs == SEL_KCSEG ? t->esp : f->esp;
   bool stack_access = is_stack_access (esp, fault_addr);
   if (ret_page == NULL && !stack_access)
   {
     f->eip = (void (*) (void)) f->eax;
     f->eax = 0xffffffff;
-    syscall_t_exit (t->name, -1);
+    syscall_t_exit (t->name, -122);
   }
 
   bool writable = true;
   bool dirty = false;
-  uint8_t *kpage = frame_get (fault_page, true);
+  uint8_t *kpage = NULL;
   if(ret_page != NULL)
   {
     struct suppl_page *page = (struct suppl_page *) ret_page;
+    kpage = frame_get (fault_page, true, page->origin);
     /* Get a page of memory. */
 
     switch (page->location)
     {
+      case EXEC:
       case FILE:
         filesys_lock_acquire();
         file_seek (page->origin->source_file, page->origin->offset);
@@ -194,7 +199,7 @@ page_fault (struct intr_frame *f)
         writable = page->origin->writable;
         break;
       case SWAP:
-        //load from swap
+        swap_load( kpage, page->swap_elem );
         break;
       case ZERO:
         memset (kpage, 0, PGSIZE);
@@ -202,6 +207,9 @@ page_fault (struct intr_frame *f)
     }
   }
 
+  if (kpage == NULL) {
+    kpage = frame_get (fault_page, true, NULL);
+  }
   pagedir_clear_page (t->pagedir, fault_page);
   /* Add the page to the process's address space. */
   if (!pagedir_set_page (t->pagedir, fault_page, kpage, writable))

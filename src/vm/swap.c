@@ -1,42 +1,71 @@
 #include "vm/swap.h"
-#include "devices/block.h"
-#include "lib/kernel/bitmap.h"
-#include "lib/kernel/hash.h"
+#include "threads/malloc.h"
+
+#include <bitmap.h>
+#include <hash.h>
+#include <debug.h>
 
 /* Swap partition */
 static struct block *swap;
+unsigned swap_size;
 
 /* Bitmap of free swap slots. */
-static struct bitmap free_swap_bitmap;
+static struct bitmap * free_swap_bitmap;
 
-struct swap_slt{
+block_sector_t swap_find_free(void);
 
-};
-
-struct swap_slt * swap_slt(){
-	block_sector_t swap_addr; //address on the swap
-	uint8_t *upage; //page we dumped here
-    struct thread * thread; //thread the page belongs to
-
-	struct hash_elem hash_elem;
-	struct list_elem list_elem;
+struct swap_slt * swap_slot( struct frame * frame ){
+	struct swap_slt * swap_slt = malloc (sizeof (struct swap_slt));
+	swap_slt -> frame = frame;
+	return swap_slt;
 }
 
-block_sector_t swap_find_free(){
-	
+block_sector_t 
+swap_find_free(){
+	bool full = bitmap_all (free_swap_bitmap, 0, swap_size);
+	if( ! full ){
+		unsigned first = 0;
+		unsigned i;
+		unsigned next;
+		first = bitmap_scan (free_swap_bitmap, first, swap_size, false);
+		while( first < swap_size){
+			next = first;
+			for( i = 0; i < 7; i++ ){
+				next = bitmap_scan (free_swap_bitmap, next + 1, swap_size - next - 1, false);
+			}
+			if( next - first == 7){
+				return first;
+			}
+			first = bitmap_scan (free_swap_bitmap, first + 1, swap_size - first - 1, false); 
+		}
+		return first;
+	} else {
+		PANIC("SWAP is full! Memory exhausted.");
+	}
 }
 
-bool swap_store(struct swap_slt * swap_slt){
+void 
+swap_store(struct swap_slt * swap_slt){
+	int i;
+
 	block_sector_t swap_addr = swap_find_free();
-	swap -> write( swap_addr, swap_slt -> addr);
+	
+	for( i = 0; i < PGSIZE / BLOCK_SECTOR_SIZE; i++ )
+		block_write ( swap, swap_addr + i, swap_slt -> frame -> addr + i * BLOCK_SECTOR_SIZE );
+	
 	swap_slt -> swap_addr = swap_addr;
+	bitmap_set_multiple ( free_swap_bitmap, swap_addr, PGSIZE / BLOCK_SECTOR_SIZE, true );
 }
 
-struct swap_slt * swap_load(){
-
+void
+swap_load(void *addr, struct swap_slt * swap_slt){
+	int i;
+	for( i = 0; i < PGSIZE / BLOCK_SECTOR_SIZE; i++ )
+		block_read( swap, swap_slt->swap_addr + i, addr + i * BLOCK_SECTOR_SIZE );
 }
 
 void swap_init(){
 	swap = block_get_role (BLOCK_SWAP);
-	//bitmap_init(&free_swap_bitmap);
+	swap_size = block_size (swap);
+	free_swap_bitmap = bitmap_create (swap_size);
 }

@@ -28,6 +28,8 @@ static void syscall_write (int *, struct intr_frame *);
 static void syscall_seek (int *, struct intr_frame *);
 static void syscall_tell (int *, struct intr_frame *);
 static void syscall_close (int *, struct intr_frame *);
+static void syscall_mmap (int *, struct intr_frame *);
+static void syscall_munmap (int *, struct intr_frame *);
 
 static void (*syscall_functions[NOA]) (int* , struct intr_frame *); /* Array of syscall functions */
 static struct lock filesys_lock;  /* File system lock */
@@ -100,6 +102,8 @@ syscall_init (void)
   syscall_functions[SYS_SEEK] = &syscall_seek;
   syscall_functions[SYS_TELL] = &syscall_tell;
   syscall_functions[SYS_CLOSE] = &syscall_close;
+  syscall_functions[SYS_MMAP] = &syscall_mmap;
+  syscall_functions[SYS_MUNMAP] = &syscall_munmap;  
 
   syscall_noa[SYS_HALT] = 0;
   syscall_noa[SYS_EXIT] = 1;
@@ -114,6 +118,8 @@ syscall_init (void)
   syscall_noa[SYS_SEEK] = 2;
   syscall_noa[SYS_TELL] = 1;
   syscall_noa[SYS_CLOSE] = 1;
+  syscall_noa[SYS_MMAP] = 2;
+  syscall_noa[SYS_MUNMAP] = 1;
 }
 
 static void
@@ -363,4 +369,46 @@ syscall_close (int *args, struct intr_frame *f UNUSED)
   file_close (fh -> file);      //Close file in the system
   thread_remove_file (fh); //Remove file from files table
   filesys_lock_release ();
+}
+
+/* void close( int ) - Closes a file with the given descriptor */
+static void
+syscall_mmap (int *args, struct intr_frame *f UNUSED)
+{
+  /*struct thread * t = thread_current();
+
+  struct file_handle * fh = thread_get_file (args[1]);
+  if( fh == NULL) syscall_t_exit (t -> name, -1);
+
+  // Book the memory
+  struct suppl_page *new_page = (struct suppl_page *) malloc (sizeof (struct suppl_page));
+  struct origin_info *origin = (struct origin_info *) malloc (sizeof (struct origin_info));
+
+  new_page->location = MMAP;
+
+  origin->source_file = fh->file;
+  origin->offset = file_length(fh->file);
+  origin->zero_after = args[2];
+  origin->writable = true;
+  origin->location = MMAP;
+
+  new_page->origin = origin;
+  new_page->swap_elem = NULL;
+
+  upage = args[2];
+
+  if (!install_page_suppl (upage, new_page))
+  {
+    free (new_page);
+    return false;
+  }
+
+  upage += PGSIZE;*/
+}
+
+/* void close( int ) - Closes a file with the given descriptor */
+static void
+syscall_munmap (int *args, struct intr_frame *f UNUSED)
+{
+
 }

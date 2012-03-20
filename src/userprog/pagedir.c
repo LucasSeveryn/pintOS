@@ -138,7 +138,7 @@ pagedir_set_page_suppl (uint32_t *pd, void *upage, struct suppl_page *page)
   ASSERT (pg_ofs (upage) == 0);
   ASSERT (((uint32_t) page & PTE_P) == 0);
   ASSERT (is_user_vaddr (upage));
-  ASSERT (vtop (page) >> PTSHIFT >= init_ram_pages);
+  ASSERT (vtop (page) >> PTSHIFT < init_ram_pages);
   ASSERT (pd != init_page_dir);
 
   pte = lookup_page (pd, upage, true);

@@ -574,9 +574,9 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       if (page_zero_bytes == PGSIZE) {
         new_page = new_zero_page();
       } else {
-        new_page = new_file_page(file, current_ofs, page_read_bytes, writable);
+        new_page = new_file_page(file, current_ofs, page_read_bytes, writable, EXEC);
       }
-
+      printf("allocating address %p to address: %p\n", upage, new_page);
       /* Add the page to the process's address space. */
       if (!install_page_suppl (upage, new_page))
         {
@@ -602,7 +602,7 @@ setup_stack (void **esp)
   uint8_t *kpage;
   bool success = false;
 
-  kpage = frame_get ( ((uint8_t *) PHYS_BASE) - PGSIZE, true);
+  kpage = frame_get ( ((uint8_t *) PHYS_BASE) - PGSIZE, true, NULL);
   if (kpage != NULL)
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);

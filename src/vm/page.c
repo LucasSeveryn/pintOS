@@ -12,16 +12,17 @@ new_zero_page()
 }
 
 struct suppl_page *
-new_file_page(struct file * source, off_t offset, size_t zero_after, bool writable)
+new_file_page(struct file * source, off_t offset, size_t zero_after, bool writable, enum page_type location)
 {
 	struct suppl_page *new_page = (struct suppl_page *) malloc (sizeof (struct suppl_page));
-	new_page->location = FILE;
+	new_page->location = location;
 
 	struct origin_info *origin = (struct origin_info *) malloc (sizeof (struct origin_info));
 	origin->source_file = source;
 	origin->offset = offset;
 	origin->zero_after = zero_after;
 	origin->writable = writable;
+	origin->location = location;
 
 	new_page->origin = origin;
 	new_page->swap_elem = NULL;
@@ -29,7 +30,7 @@ new_file_page(struct file * source, off_t offset, size_t zero_after, bool writab
 }
 
 struct suppl_page *
-new_swap_page(struct swap_block *swap_location)
+new_swap_page(struct swap_slt *swap_location)
 {
 	struct suppl_page *new_page = (struct suppl_page *) malloc (sizeof (struct suppl_page));
 	new_page->location = SWAP;

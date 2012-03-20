@@ -12,8 +12,10 @@
 enum page_type
 	{
 		FILE,
+		EXEC,
 		SWAP,
-		ZERO
+		ZERO,
+		MMAP
 	};
 
 struct suppl_page
@@ -23,7 +25,7 @@ struct suppl_page
 		// Where on the filesystem the data originally resides
 		struct origin_info *origin;
 		// If we are located in the swap this elements points to swap
-		struct swap_block *swap_elem;
+		struct swap_slt *swap_elem;
 	};
 
 struct origin_info
@@ -32,10 +34,11 @@ struct origin_info
 		off_t offset;
 		size_t zero_after;
 		bool writable;
+		enum page_type location;
 	};
 
-struct suppl_page * new_file_page (struct file *, off_t, size_t, bool);
-struct suppl_page * new_swap_page (struct swap_block *);
+struct suppl_page * new_file_page (struct file *, off_t, size_t, bool, enum page_type);
+struct suppl_page * new_swap_page (struct swap_slt *);
 struct suppl_page * new_zero_page (void);
 inline bool is_stack_access(void *esp, void *address);
 

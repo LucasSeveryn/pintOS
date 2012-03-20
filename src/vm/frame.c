@@ -1,10 +1,11 @@
-#include "frame.h"
-#include "lib/kernel/hash.h"
+#include "vm/frame.h"
+
 #include "threads/synch.h"
 #include "threads/palloc.h"
 #include "threads/malloc.h"
 #include "threads/thread.h"
 #include "userprog/pagedir.h"
+#include "userprog/syscall.h"
 
 static struct hash frames;
 static struct lock frames_lock;
@@ -14,7 +15,7 @@ void lock_frames (void);
 void unlock_frames (void);
 bool frame_less (const struct hash_elem *, const struct hash_elem *, void *);
 unsigned frame_hash (const struct hash_elem *, void *);
-
+void page_dump( uint32_t *, void *, struct frame * );
 
 void
 lock_frames (){
@@ -32,12 +33,13 @@ frame_init (){
 }
 
 void *
-frame_get (void * upage, bool zero){
+frame_get (void * upage, bool zero, struct origin_info *origin){
 	void * kpage = palloc_get_page ( PAL_USER | (zero ? PAL_ZERO : 0) );
+	struct thread * t = thread_current();
 
 	/* There is no more free memory, we need to free some */
 	if( kpage == NULL ) {
-		kpage = evict( upage, thread_current() );
+		kpage = evict( upage, t );
 	}
 
 	/* We succesfully allocated space for the page */
@@ -45,7 +47,8 @@ frame_get (void * upage, bool zero){
 		struct frame * frame = (struct frame*) malloc (sizeof (struct frame));
 		frame -> addr = kpage;
 		frame -> upage = upage;
-		frame -> thread = thread_current ();
+		frame -> origin = origin;
+		frame -> thread = t;
 
 		lock_frames();
 		hash_insert (&frames, &frame -> hash_elem);
@@ -69,7 +72,8 @@ frame_free (void * addr){
 		lock_frames();
 		palloc_free_page (frame->addr);
 		hash_delete ( &frames, &frame->hash_elem );
-		free (frame->addr);
+		//free (frame->addr);
+		free (frame);
 		unlock_frames();
 
 
@@ -121,20 +125,28 @@ get_class( uint32_t * pd, const void * page ){
 }
 
 void
-page_dump( uint32_t * pd, void * page, struct frame * frame ){
-	/*bool dirty = pagedir_is_dirty ( pd, page );
+page_dump( uint32_t * pd, void * upage, struct frame * frame ){
+	bool dirty = pagedir_is_dirty ( pd, upage );
+	struct suppl_page * suppl_page;
 
-	if( dirty ){
-		if( write_buffer -> isFull() ){
-			PANIC("WTF HAS JUST HAPPENED?!");
-			//write_buffer -> forceWrite();
-		}
+	if( dirty && (frame->origin == NULL || frame->origin->location == EXEC) ){
+		struct swap_slt * swap_el = swap_slot( frame );
+		swap_store ( swap_el );
+		suppl_page = new_swap_page ( swap_el );
+	} else if( dirty && frame->origin->location == FILE) {
+		filesys_lock_acquire ();
+		file_write_at (frame->origin->source_file, frame->addr, frame->origin->zero_after, frame->origin->offset);
+		filesys_lock_release ();
 
-		write_buffer -> add( pd, page );
+		suppl_page = new_file_page(frame->origin->source_file, frame->origin->offset, frame->origin->zero_after, frame->origin->writable, FILE);
+	} else {
+		//We are failing here. frame->origin = 0 :/
+		suppl_page = new_file_page(frame->origin->source_file, frame->origin->offset, frame->origin->zero_after, frame->origin->writable, FILE);	
 	}
 
-	pagedir_set_accessed ( pd, page, false );
-	pagedir_set_dirty ( pd, page, false );*/
+	pagedir_clear_page ( pd, upage );
+	pagedir_set_page_suppl ( pd, upage, suppl_page );
+	pagedir_set_accessed ( pd, upage, false );
 }
 
 void *
@@ -148,28 +160,25 @@ evict( void * upage, struct thread * th ){
 		hash_first (&it, &frames);
 		while(kpage == NULL && hash_next (&it)){
 			struct frame *f = hash_entry (hash_cur (&it), struct frame, hash_elem);
-			if( f->thread == th ){
-				int class = get_class (pd, upage);
-				if( class == 1 ){
-					page_dump (pd, upage, f);
-					kpage = f->addr;
-				}
+			int class = get_class (pd, upage);
+			if( class == 1 ){
+				page_dump (pd, upage, f);
+				kpage = f->addr;
 			}
 		}
 
 		hash_first (&it, &frames);
 		while(kpage == NULL && hash_next (&it)){
 			struct frame *f = hash_entry (hash_cur (&it), struct frame, hash_elem);
-			if( f->thread == th ){
-				int class = get_class (pd, upage);
-				if( class == 3 ){
-					page_dump (pd, upage, f);
-					kpage = f->addr;
-				}
-				pagedir_set_accessed (pd, upage, false);
+			int class = get_class (pd, upage);
+			if( class == 3 ){
+				page_dump (pd, upage, f);
+				kpage = f->addr;
 			}
+			pagedir_set_accessed (pd, upage, false);
 		}
 	}
 
+	frame_free (kpage);
 	return kpage;
 }
