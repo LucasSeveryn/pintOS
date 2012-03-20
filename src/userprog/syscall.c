@@ -15,11 +15,6 @@
 static void syscall_handler (struct intr_frame *);
 static int * syscall_retrieve_args (struct intr_frame *);
 
-static void filesys_lock_release (void);
-static void filesys_lock_acquire (void);
-
-static void syscall_t_exit (char *, int);
-
 static void syscall_halt (int *, struct intr_frame *);
 static void syscall_exit (int *, struct intr_frame *);
 static void syscall_exec (int *, struct intr_frame *);
@@ -124,9 +119,11 @@ syscall_init (void)
 static void
 syscall_handler (struct intr_frame *f)
 {
+  struct thread *t = thread_current ();
+  t->esp = f->esp;
   int syscall_number = get_word_user((int *)(f -> esp));
   if(syscall_number < SYS_HALT || syscall_number > SYS_CLOSE){
-    syscall_t_exit (thread_current () -> name, -1);
+    syscall_t_exit (t -> name, -1);
   }
 
   int *args = syscall_retrieve_args (f);
@@ -135,7 +132,7 @@ syscall_handler (struct intr_frame *f)
 }
 
 /* Function which wrapps everything that has to be done when calling exit */
-static void
+void
 syscall_t_exit (char * p_name, int status)
 {
   thread_current () -> ret = status;

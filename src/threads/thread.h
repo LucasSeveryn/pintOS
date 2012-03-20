@@ -105,8 +105,7 @@ struct thread
     /* Owned by thread.c. */
     tid_t tid;                          /* Thread identifier. */
     enum thread_status status;          /* Thread state. */
-    char name[16];
-    /*char * file_name;*/
+    char name[16];                      /* char * file_name */
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
     struct list_elem allelem;           /* List element for all threads list. */
@@ -114,13 +113,13 @@ struct thread
     int64_t time_to_wake;               /* Absolute time after which thread will wake up. */
     FIXED recent_cpu;                   /* 4.4BSD SCH - recent cpu */
 
-	  int nice;                            /* 4.4BSD SCH - nice value */
+	  int nice;                           /* 4.4BSD SCH - nice value */
 	  int base_priority;					        /* priority set through set_priority */
     bool is_donated;                    /* whether current priority is donated */
 
     struct list held_locks;			      	/* locks held by thread */
   	struct lock *blocked_on;			      /* lock on which current thread is waiting */
-    struct semaphore *waiting_on;        /* semaphore on which our thread is waiting */
+    struct semaphore *waiting_on;       /* semaphore on which our thread is waiting */
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
@@ -128,6 +127,8 @@ struct thread
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
+
+    void *esp;                       /* Saved stack pointer from before entering kernel mode. */
 
     int ret;                            /* return status of the process */
     struct semaphore * child_alive;     /* smaphore indicating that child have not died yet */

@@ -1,9 +1,17 @@
 #include "userprog/exception.h"
 #include <inttypes.h>
 #include <stdio.h>
+#include <string.h>
 #include "userprog/gdt.h"
+#include "userprog/syscall.h"
+#include "userprog/pagedir.h"
 #include "threads/interrupt.h"
 #include "threads/thread.h"
+#include "threads/pte.h"
+#include "vm/swap.h"
+#include "vm/page.h"
+#include "vm/frame.h"
+#include "vm/page.h"
 
 /* Number of page faults processed. */
 static long long page_fault_cnt;
@@ -148,11 +156,58 @@ page_fault (struct intr_frame *f)
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
 
-  f->eip = (void (*) (void)) f->eax;
-  f->eax = 0xffffffff;
+  void * fault_page = (void *) (PTE_ADDR & (uint32_t) fault_addr);
+  struct thread *t = thread_current ();
 
-  // Since we don't have any virtual memory we simply kill the process
-  thread_current () -> ret = -1;
-  printf ("%s: exit(%d)\n", thread_current () -> name, -1);
-  thread_exit ();
+  void *ret_page = pagedir_get_page(t->pagedir, fault_addr);
+  void *esp = f->cs == SEL_KCSEG ? t->esp : f->esp;
+  bool stack_access = is_stack_access (esp, fault_addr);
+  if (ret_page == NULL && !stack_access)
+  {
+    f->eip = (void (*) (void)) f->eax;
+    f->eax = 0xffffffff;
+    syscall_t_exit (t->name, -1);
+  }
+
+  bool writable = true;
+  bool dirty = false;
+  uint8_t *kpage = frame_get (fault_page, true);
+  if(ret_page != NULL)
+  {
+    struct suppl_page *page = (struct suppl_page *) ret_page;
+    /* Get a page of memory. */
+
+    switch (page->location)
+    {
+      case FILE:
+        filesys_lock_acquire();
+        file_seek (page->origin->source_file, page->origin->offset);
+        if (file_read (page->origin->source_file, kpage, page->origin->zero_after)
+          != (int) page->origin->zero_after)
+        {
+          frame_free (kpage);
+          filesys_lock_release();
+          syscall_t_exit (t->name, -1);
+        }
+        filesys_lock_release();
+        memset (kpage + page->origin->zero_after, 0, PGSIZE - page->origin->zero_after);
+        writable = page->origin->writable;
+        break;
+      case SWAP:
+        //load from swap
+        break;
+      case ZERO:
+        memset (kpage, 0, PGSIZE);
+        break;
+    }
+  }
+
+  pagedir_clear_page (t->pagedir, fault_page);
+  /* Add the page to the process's address space. */
+  if (!pagedir_set_page (t->pagedir, fault_page, kpage, writable))
+  {
+    frame_free (kpage);
+    syscall_t_exit (t->name, -1);
+  }
+  pagedir_set_dirty (t->pagedir, fault_page, dirty);
 }

@@ -124,6 +124,35 @@ pagedir_set_page (uint32_t *pd, void *upage, void *kpage, bool writable)
     return false;
 }
 
+/* Adds a mapping in page directory PD from user virtual page
+   UPAGE to the struct represnting where the data should be stored.
+   UPAGE must not already be mapped.
+   PAGE must represent suppl_page entry.
+   Returns true if successful, false if memory allocation
+   failed. */
+bool
+pagedir_set_page_suppl (uint32_t *pd, void *upage, struct suppl_page *page)
+{
+  uint32_t *pte;
+
+  ASSERT (pg_ofs (upage) == 0);
+  ASSERT (((uint32_t) page & PTE_P) == 0);
+  ASSERT (is_user_vaddr (upage));
+  ASSERT (vtop (page) >> PTSHIFT >= init_ram_pages);
+  ASSERT (pd != init_page_dir);
+
+  pte = lookup_page (pd, upage, true);
+
+  if (pte != NULL)
+    {
+      ASSERT ((*pte & PTE_P) == 0);
+      *pte = (uint32_t) page;
+      return true;
+    }
+  else
+    return false;
+}
+
 /* Looks up the physical address that corresponds to user virtual
    address UADDR in PD.  Returns the kernel virtual address
    corresponding to that physical address, or a null pointer if
@@ -136,10 +165,22 @@ pagedir_get_page (uint32_t *pd, const void *uaddr)
   ASSERT (is_user_vaddr (uaddr));
 
   pte = lookup_page (pd, uaddr, false);
-  if (pte != NULL && (*pte & PTE_P) != 0)
-    return pte_get_page (*pte) + pg_ofs (uaddr);
+  if (pte != NULL)
+  {
+    if ((*pte & PTE_P) != 0)
+      return pte_get_page (*pte) + pg_ofs (uaddr);
+    else
+    {
+      if (*pte != 0)
+        return (void *) *pte;
+      else
+        return NULL;
+    }
+  }
   else
+  {
     return NULL;
+  }
 }
 
 /* Marks user virtual page UPAGE "not present" in page
@@ -157,7 +198,7 @@ pagedir_clear_page (uint32_t *pd, void *upage)
   pte = lookup_page (pd, upage, false);
   if (pte != NULL && (*pte & PTE_P) != 0)
     {
-      *pte &= ~PTE_P;
+      *pte = 0;
       invalidate_pagedir (pd);
     }
 }

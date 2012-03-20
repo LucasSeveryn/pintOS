@@ -3,8 +3,11 @@
 
 #include "vm/swap.h"
 #include "filesys/file.h"
+#include "threads/vaddr.h"
 #include <stdbool.h>
 #include <stdlib.h>
+
+#define STACK_BOTTOM ((void *) 0xbf800000)
 
 enum page_type
 	{
@@ -34,5 +37,6 @@ struct origin_info
 struct suppl_page * new_file_page (struct file *, off_t, size_t, bool);
 struct suppl_page * new_swap_page (struct swap_block *);
 struct suppl_page * new_zero_page (void);
+inline bool is_stack_access(void *esp, void *address);
 
 #endif /* vm/page.h */

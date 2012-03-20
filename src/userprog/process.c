@@ -20,6 +20,7 @@
 #include "threads/vaddr.h"
 #include "threads/malloc.h"
 #include "vm/frame.h"
+#include "vm/page.h"
 
 bool DEBUG = false;
 
@@ -121,6 +122,7 @@ start_process (void *file_name_)
     file_deny_write (file);
   } else {
     /* If load failed, quit. */
+    palloc_free_page (file_name);
     cur->ret = -1;
     printf ("%s: exit(%d)\n", cur->name, -1);
     sema_up (cur->parent->child_loading);
@@ -149,6 +151,8 @@ start_process (void *file_name_)
   }
 
   int **addresses = (int **) malloc (argc * sizeof(int *));
+  if (addresses == NULL)
+    PANIC("Out of memory, trying to alocate %d bytes.\n", argc * sizeof(int *));
 
   int i;
   for (i = argc - 1; i >= 0; i--)
@@ -486,6 +490,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
 /* load() helpers. */
 
 static bool install_page (void *upage, void *kpage, bool writable);
+static bool install_page_suppl (void *upage, struct suppl_page *page);
 
 /* Checks whether PHDR describes a valid, loadable segment in
    FILE and returns true if so, false otherwise. */
@@ -554,7 +559,8 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
   ASSERT (pg_ofs (upage) == 0);
   ASSERT (ofs % PGSIZE == 0);
 
-  file_seek (file, ofs);
+  off_t current_ofs = ofs;
+
   while (read_bytes > 0 || zero_bytes > 0)
     {
       /* Calculate how to fill this page.
@@ -563,23 +569,18 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
-      /* Get a page of memory. */
-      uint8_t *kpage = frame_get (upage, false);
-      if (kpage == NULL)
-        return false;
+      struct suppl_page *new_page;
 
-      /* Load this page. */
-      if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
-        {
-          frame_free (kpage);
-          return false;
-        }
-      memset (kpage + page_read_bytes, 0, page_zero_bytes);
+      if (page_zero_bytes == PGSIZE) {
+        new_page = new_zero_page();
+      } else {
+        new_page = new_file_page(file, current_ofs, page_read_bytes, writable);
+      }
 
       /* Add the page to the process's address space. */
-      if (!install_page (upage, kpage, writable))
+      if (!install_page_suppl (upage, new_page))
         {
-          frame_free (kpage);
+          free (new_page);
           return false;
         }
 
@@ -587,7 +588,9 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       read_bytes -= page_read_bytes;
       zero_bytes -= page_zero_bytes;
       upage += PGSIZE;
+      current_ofs += PGSIZE;
     }
+  file_seek (file, ofs);
   return true;
 }
 
@@ -629,4 +632,24 @@ install_page (void *upage, void *kpage, bool writable)
      address, then map our page there. */
   return (pagedir_get_page (t->pagedir, upage) == NULL
           && pagedir_set_page (t->pagedir, upage, kpage, writable));
+}
+
+
+/* Adds a mapping from user virtual address UPAGE to kernel
+   adress representing supplementary information about where
+   the required data resides.
+   This indicates that the frame
+   is not present in memory and should be fetched from disk
+   or swap.
+   Returns true on success, false if UPAGE is already mapped or
+   if memory allocation fails.*/
+static bool
+install_page_suppl (void *upage, struct suppl_page *page)
+{
+  struct thread *t = thread_current ();
+
+  /* Verify that there's not already a page at that virtual
+     address, then map our page there. */
+  return (pagedir_get_page (t->pagedir, upage) == NULL
+          && pagedir_set_page_suppl (t->pagedir, upage, page));
 }
