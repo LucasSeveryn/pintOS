@@ -29,6 +29,7 @@
 #include "userprog/syscall.h"
 #include "userprog/tss.h"
 #include "vm/frame.h"
+#include "vm/swap.h"
 #else
 #include "tests/threads/tests.h"
 #endif
@@ -114,6 +115,7 @@ main (void)
 #ifdef USERPROG
   exception_init ();
   syscall_init ();
+  swap_init();
   frame_init();
 #endif
 
