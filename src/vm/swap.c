@@ -24,21 +24,7 @@ block_sector_t
 swap_find_free(){
 	bool full = bitmap_all (free_swap_bitmap, 0, swap_size);
 	if( ! full ){
-		unsigned first = 0;
-		unsigned i;
-		unsigned next;
-		first = bitmap_scan (free_swap_bitmap, first, swap_size, false);
-		while( first < swap_size){
-			next = first;
-			for( i = 0; i < 7; i++ ){
-				next = bitmap_scan (free_swap_bitmap, next + 1, swap_size - next - 1, false);
-			}
-			if( next - first == 7){
-				return first;
-			}
-			first = bitmap_scan (free_swap_bitmap, first + 1, swap_size - first - 1, false); 
-		}
-		return first;
+		return bitmap_scan (free_swap_bitmap, 0, PGSIZE / BLOCK_SECTOR_SIZE, false);
 	} else {
 		PANIC("SWAP is full! Memory exhausted.");
 	}
@@ -62,6 +48,7 @@ swap_load(void *addr, struct swap_slt * swap_slt){
 	int i;
 	for( i = 0; i < PGSIZE / BLOCK_SECTOR_SIZE; i++ )
 		block_read( swap, swap_slt->swap_addr + i, addr + i * BLOCK_SECTOR_SIZE );
+	bitmap_set_multiple ( free_swap_bitmap, swap_slt->swap_addr, PGSIZE / BLOCK_SECTOR_SIZE, false );
 }
 
 void swap_init(){

@@ -401,9 +401,7 @@ syscall_mmap (int *args, struct intr_frame *f UNUSED)
   {
     free (new_page);
     return false;
-  }
-
-  upage += PGSIZE;*/
+  }*/
 }
 
 /* void close( int ) - Closes a file with the given descriptor */
