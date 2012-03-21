@@ -2,3 +2,5 @@ cscope.files
 cscope.out
 TAGS
 tags
+*.sublime-*
+DESIGNDOC
