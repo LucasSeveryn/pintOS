@@ -10,6 +10,10 @@
 #include "filesys/filesys.h"
 #include "devices/shutdown.h"
 #include "devices/input.h"
+#include "vm/page.h"
+#include "vm/frame.h"
+
+#include "userprog/pagedir.h"
 #include <kernel/stdio.h>
 
 static void syscall_handler (struct intr_frame *);
@@ -128,7 +132,7 @@ syscall_handler (struct intr_frame *f)
   struct thread *t = thread_current ();
   t->esp = f->esp;
   int syscall_number = get_word_user((int *)(f -> esp));
-  if(syscall_number < SYS_HALT || syscall_number > SYS_CLOSE){
+  if(syscall_number < SYS_HALT || syscall_number > SYS_MUNMAP){
     syscall_t_exit (t -> name, -1);
   }
 
@@ -249,8 +253,9 @@ syscall_open (int *args, struct intr_frame *f )
 static void
 syscall_filesize (int *args, struct intr_frame *f )
 {
-  struct file_handle * fh = thread_get_file (args[1]);
-  if( fh == NULL ) syscall_t_exit (thread_current () -> name, -1);
+  struct thread * t = thread_current();
+  struct file_handle * fh = thread_get_file (&t->files, args[1]);
+  if( fh == NULL ) syscall_t_exit (t->name, -1);
 
   f->eax = file_length (fh->file);
 }
@@ -259,6 +264,7 @@ syscall_filesize (int *args, struct intr_frame *f )
 static void
 syscall_read (int *args, struct intr_frame *f )
 {
+  struct thread * t = thread_current();
   if( args[1] == 0){
     int i = 0;
     uint8_t * buffer = (uint8_t *) args[2];
@@ -277,8 +283,8 @@ syscall_read (int *args, struct intr_frame *f )
     uint8_t * buffer = (uint8_t *) args[2];
     validate_user (buffer);
 
-    struct file_handle * fh = thread_get_file (args[1]);
-    if( fh == NULL ) syscall_t_exit (thread_current () -> name, -1);
+    struct file_handle * fh = thread_get_file (&t->files, args[1]);
+    if( fh == NULL ) syscall_t_exit (t->name, -1);
 
     filesys_lock_acquire ();
     off_t written = file_read (fh->file, buffer, args[3]);
@@ -292,6 +298,7 @@ syscall_read (int *args, struct intr_frame *f )
 static void
 syscall_write (int *args, struct intr_frame *f)
 {
+  struct thread * t = thread_current();
   if( args[1] == 0){
     //ERROR - we are trying to write to input :P
   } else if(args[1] == 1){
@@ -322,8 +329,8 @@ syscall_write (int *args, struct intr_frame *f)
     uint8_t * buffer = (uint8_t *) args[2];
     validate_user (buffer);
 
-    struct file_handle * fh = thread_get_file (args[1]);
-    if( fh == NULL ) syscall_t_exit (thread_current () -> name, -1);
+    struct file_handle * fh = thread_get_file (&t->files, args[1]);
+    if( fh == NULL ) syscall_t_exit (t->name, -1);
 
     filesys_lock_acquire ();
     off_t written = file_write (fh->file, buffer, args[3]);
@@ -337,8 +344,9 @@ syscall_write (int *args, struct intr_frame *f)
 static void
 syscall_seek (int *args, struct intr_frame *f UNUSED)
 {
-  struct file_handle * fh = thread_get_file (args[1]);
-  if( fh == NULL) syscall_t_exit (thread_current () -> name, -1);
+  struct thread * t = thread_current();
+  struct file_handle * fh = thread_get_file (&t->files, args[1]);
+  if( fh == NULL) syscall_t_exit (t->name, -1);
 
   filesys_lock_acquire ();
   file_seek (fh->file, args[2]);
@@ -348,8 +356,9 @@ syscall_seek (int *args, struct intr_frame *f UNUSED)
 /* unsigned tell( int ) - Returns the position of the next byte to be read or written */
 static void
 syscall_tell (int *args, struct intr_frame *f){
-  struct file_handle * fh = thread_get_file (args[1]);
-  if( fh == NULL) syscall_t_exit (thread_current () -> name, -1);
+  struct thread * t = thread_current();
+  struct file_handle * fh = thread_get_file (&t->files, args[1]);
+  if( fh == NULL) syscall_t_exit (t->name, -1);
 
   filesys_lock_acquire ();
   off_t position = file_tell (fh->file);
@@ -362,8 +371,7 @@ static void
 syscall_close (int *args, struct intr_frame *f UNUSED)
 {
   struct thread * t = thread_current();
-
-  struct file_handle * fh = thread_get_file (args[1]);
+  struct file_handle * fh = thread_get_file (&t->files, args[1]);
   if( fh == NULL) syscall_t_exit (t -> name, -1);
   filesys_lock_acquire ();
   file_close (fh -> file);      //Close file in the system
@@ -375,38 +383,84 @@ syscall_close (int *args, struct intr_frame *f UNUSED)
 static void
 syscall_mmap (int *args, struct intr_frame *f UNUSED)
 {
-  /*struct thread * t = thread_current();
+  struct thread * t = thread_current ();
 
-  struct file_handle * fh = thread_get_file (args[1]);
+  if( args[1] == 0 || args[1] == 1){
+    f->eax = -1;
+    return;
+  }
+  struct file_handle * fh = thread_get_file (&t->files, args[1]);
   if( fh == NULL) syscall_t_exit (t -> name, -1);
 
   // Book the memory
-  struct suppl_page *new_page = (struct suppl_page *) malloc (sizeof (struct suppl_page));
-  struct origin_info *origin = (struct origin_info *) malloc (sizeof (struct origin_info));
+  int mmap_fd = thread_add_mmap_file (file_reopen (fh->file));
+  struct file_handle * mmap_fh = thread_get_file (&t->mmap_files, mmap_fd);
 
-  new_page->location = MMAP;
+  size_t fl = file_length (mmap_fh->file);
+  if( fl == 0 || args[2] == 0 || args[2] % PGSIZE > 0){
+    f->eax = -1;
+    return;
+  }
 
-  origin->source_file = fh->file;
-  origin->offset = file_length(fh->file);
-  origin->zero_after = args[2];
-  origin->writable = true;
-  origin->location = MMAP;
+  void * upage = (void*)args[2];
+  mmap_fh->upage = upage;
+  int pages = fl / PGSIZE;
+  if( fl % PGSIZE > 0 ){
+    pages++;
+  }
 
-  new_page->origin = origin;
-  new_page->swap_elem = NULL;
+  int i;
+  for( i = 0; i < pages; i++ ){
+    struct suppl_page *new_page = (struct suppl_page *) malloc (sizeof (struct suppl_page));
+    struct origin_info *origin = (struct origin_info *) malloc (sizeof (struct origin_info));
 
-  upage = args[2];
+    new_page->location = MMAP;
 
-  if (!install_page_suppl (upage, new_page))
-  {
-    free (new_page);
-    return false;
-  }*/
+    origin->source_file = mmap_fh->file;
+    origin->offset = i * PGSIZE;
+    origin->zero_after = ( i == pages - 1) ? fl%PGSIZE : PGSIZE;
+    origin->writable = true;
+    origin->location = MMAP;
+
+    new_page->origin = origin;
+    new_page->swap_elem = NULL;
+    void * overlapControl = pagedir_get_page(t->pagedir, upage + i*PGSIZE);
+    if( overlapControl != NULL ){
+      f->eax = -1;
+      return;
+    }
+    pagedir_set_page_suppl (t->pagedir, upage + i*PGSIZE, new_page);
+  }
+
+  f->eax = mmap_fd;
 }
 
 /* void close( int ) - Closes a file with the given descriptor */
 static void
 syscall_munmap (int *args, struct intr_frame *f UNUSED)
 {
+  struct thread * t = thread_current ();
+  struct file_handle * fh = thread_get_file (&t->mmap_files, args[1]);
+  void * upage = fh->upage;
+  size_t fl = file_length (fh->file);
+  int pages = fl / PGSIZE;
+  if( fl % PGSIZE > 0 ){
+    pages++;
+  }
 
+  int i;
+  for( i = 0; i < pages; i++ ){
+    void * uaddr = upage + i*PGSIZE;
+    bool dirty = pagedir_is_dirty (t->pagedir, uaddr);
+    if(dirty){
+      int zero_after = ( i == pages - 1) ? fl%PGSIZE : PGSIZE;
+      file_seek (fh->file, i*PGSIZE);
+      file_write (fh->file, uaddr, zero_after);
+    }
+    pagedir_clear_page (t->pagedir, uaddr);
+  }
+
+  list_remove (&fh->elem);
+  file_close (fh->file);
+  free (fh);
 }

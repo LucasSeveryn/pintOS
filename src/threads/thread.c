@@ -16,6 +16,7 @@
 #include "threads/malloc.h"
 #ifdef USERPROG
 #include "userprog/process.h"
+#include "userprog/pagedir.h"
 #endif
 
 /* Random value for struct thread's `magic' member.
@@ -381,6 +382,10 @@ thread_exit (void)
   ASSERT (!intr_context ());
 
 #ifdef USERPROG
+  struct list_elem *e;
+  struct file_handle * fh;
+  struct return_status * rs;
+
   if(t->parent != NULL){
     struct return_status * return_status = malloc (sizeof (struct return_status));
     return_status -> tid = t -> tid;
@@ -388,12 +393,34 @@ thread_exit (void)
     list_push_back (&t->parent->children_return, &return_status->elem);
   }
 
+  while (!list_empty (&t->mmap_files))
+  {
+    e = list_pop_front (&t->mmap_files);
+    fh = list_entry (e, struct file_handle, elem);
+    void * upage = fh->upage;
+    size_t fl = file_length (fh->file);
+    int pages = fl / PGSIZE;
+    if( fl % PGSIZE > 0 ){
+      pages++;
+    }
+
+    int i;
+    for( i = 0; i < pages; i++ ){
+      void * uaddr = upage + i*PGSIZE;
+      bool dirty = pagedir_is_dirty (t->pagedir, uaddr);
+      if(dirty){
+        int zero_after = ( i == pages - 1) ? fl%PGSIZE : PGSIZE;
+        file_seek (fh->file, i*PGSIZE);
+        file_write (fh->file, uaddr, zero_after);
+      }
+    }    
+    file_close (fh->file);
+    free (fh);
+  }
+
   if(t->child_alive != NULL) sema_up (t->child_alive);
 
   process_exit ();
-  struct list_elem *e;
-  struct file_handle * fh;
-  struct return_status * rs;
 
   //Close open files
   while (!list_empty (&t->files))
@@ -717,8 +744,10 @@ init_thread (struct thread *t, const char *name, int priority)
   t->child_alive = NULL;
   list_init (&t->children);
   list_init (&t->files);
+  list_init (&t->mmap_files);
   list_init (&t->children_return);
   t->next_fd = 2;
+  t->next_mmap_fd = 2;
   #endif
   t->magic = THREAD_MAGIC;
 
@@ -861,12 +890,11 @@ uint32_t thread_stack_ofs = offsetof (struct thread, stack);
 
 #ifdef USERPROG
 struct file_handle *
-thread_get_file(int fd){
+thread_get_file(struct list * files, int fd){
   struct file_handle * fh_found;
-  struct thread * t = thread_current();
   struct list_elem *e;
 
-  for (e = list_begin (&t->files); e != list_end (&t->files); e = list_next (e))
+  for (e = list_begin (files); e != list_end (files); e = list_next (e))
   {
     fh_found = list_entry (e, struct file_handle, elem);
     if( fh_found -> fd == fd) return fh_found;
@@ -902,6 +930,17 @@ thread_add_file(struct file * file){
   return fh->fd;
 }
 
+int
+thread_add_mmap_file(struct file * file){
+  struct file_handle * fh = malloc (sizeof (struct file_handle));
+  struct thread * t = thread_current ();
+
+  fh->fd = t->next_mmap_fd++;
+  fh->file = file;
+  list_push_front (&t->mmap_files, &fh->elem);
+
+  return fh->fd;
+}
 void
 thread_remove_file(struct file_handle * fh){
   list_remove (&fh -> elem);

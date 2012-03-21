@@ -184,10 +184,12 @@ page_fault (struct intr_frame *f)
     switch (page->location)
     {
       case EXEC:
+      case MMAP:
       case FILE:
         filesys_lock_acquire();
         file_seek (page->origin->source_file, page->origin->offset);
-        if (file_read (page->origin->source_file, kpage, page->origin->zero_after)
+        int a;
+        if ((a = file_read (page->origin->source_file, kpage, page->origin->zero_after))
           != (int) page->origin->zero_after)
         {
           frame_free (kpage);

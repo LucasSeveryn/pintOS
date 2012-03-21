@@ -91,7 +91,9 @@ struct file_handle
     int fd;                             /* file descriptor */
     struct file * file;                 /* pointer to the file */
     struct list_elem elem;
+    void * upage;
   };
+
 
 struct return_status
   {
@@ -140,7 +142,9 @@ struct thread
     struct list children_return;        /* children statuses */
 
     struct list files;                  /*  files opened by the process*/
+    struct list mmap_files;                  /*  files mmaped by the process*/
     int next_fd;                        /*  descripton for next open file*/
+    int next_mmap_fd;
 #endif
 
     /* Owned by thread.c. */
@@ -186,8 +190,10 @@ int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
 struct thread* get_thread_by_tid(tid_t);
-struct file_handle * thread_get_file(int);
+struct file_handle * thread_get_file(struct list *, int);
 int thread_add_file(struct file *);
+int thread_add_mmap_file(struct file *);
+
 void thread_remove_file(struct file_handle * fh);
 
 void thread_add_child (struct thread *, tid_t);
