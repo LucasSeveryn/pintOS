@@ -131,19 +131,29 @@ page_dump( uint32_t * pd, void * upage, struct frame * frame ){
 	bool dirty = pagedir_is_dirty ( pd, upage );
 	struct suppl_page * suppl_page;
 
-	if( dirty && (frame->origin == NULL || frame->origin->location == EXEC) ){
-		struct swap_slt * swap_el = swap_slot( frame );
-		swap_store ( swap_el );
-		suppl_page = new_swap_page ( swap_el );
-	} else if( dirty && frame->origin->location == FILE) {
-		filesys_lock_acquire ();
-		file_write_at (frame->origin->source_file, frame->addr, frame->origin->zero_after, frame->origin->offset);
-		filesys_lock_release ();
+	if (dirty)
+	{
+		if (frame->origin != NULL && frame->origin->location == FILE)
+		{
+			filesys_lock_acquire ();
+			file_write_at (frame->origin->source_file, frame->addr, frame->origin->zero_after, frame->origin->offset);
+			filesys_lock_release ();
 
-		suppl_page = new_file_page(frame->origin->source_file, frame->origin->offset, frame->origin->zero_after, frame->origin->writable, FILE);
-	} else {
-		//We are failing here. frame->origin = 0 :/
-		suppl_page = new_zero_page();
+			suppl_page = new_file_page(frame->origin->source_file, frame->origin->offset, frame->origin->zero_after, frame->origin->writable, FILE);
+		} else {
+			struct swap_slt * swap_el = swap_slot( frame );
+			swap_store ( swap_el );
+			suppl_page = new_swap_page ( swap_el );
+		}
+	}
+	else
+	{
+		if (frame->origin != NULL)
+		{
+			suppl_page = new_file_page(frame->origin->source_file, frame->origin->offset, frame->origin->zero_after, frame->origin->writable, frame->origin->location);
+		} else {
+			suppl_page = new_zero_page ();
+		}
 	}
 
 	pagedir_clear_page ( pd, upage );

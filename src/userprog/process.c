@@ -22,7 +22,7 @@
 #include "vm/frame.h"
 #include "vm/page.h"
 
-static bool DEBUG = true;
+static bool DEBUG = false;
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);

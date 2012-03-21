@@ -15,6 +15,7 @@ struct swap_slt{
 void swap_init(void);
 void swap_load(void *, struct swap_slt*);
 void swap_store(struct swap_slt *);
+void swap_free(struct swap_slt *);
 struct swap_slt * swap_slot(struct frame *);
 
 #endif /* vm/swap.h */

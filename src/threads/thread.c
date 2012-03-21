@@ -413,7 +413,7 @@ thread_exit (void)
         file_seek (fh->file, i*PGSIZE);
         file_write (fh->file, uaddr, zero_after);
       }
-    }    
+    }
     file_close (fh->file);
     free (fh);
   }

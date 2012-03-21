@@ -107,7 +107,7 @@ syscall_init (void)
   syscall_functions[SYS_TELL] = &syscall_tell;
   syscall_functions[SYS_CLOSE] = &syscall_close;
   syscall_functions[SYS_MMAP] = &syscall_mmap;
-  syscall_functions[SYS_MUNMAP] = &syscall_munmap;  
+  syscall_functions[SYS_MUNMAP] = &syscall_munmap;
 
   syscall_noa[SYS_HALT] = 0;
   syscall_noa[SYS_EXIT] = 1;
@@ -411,25 +411,16 @@ syscall_mmap (int *args, struct intr_frame *f UNUSED)
 
   int i;
   for( i = 0; i < pages; i++ ){
-    struct suppl_page *new_page = (struct suppl_page *) malloc (sizeof (struct suppl_page));
-    struct origin_info *origin = (struct origin_info *) malloc (sizeof (struct origin_info));
+    size_t zero_after = ( i == pages - 1) ? fl % PGSIZE : PGSIZE;
+    off_t offset = i * PGSIZE;
+    struct suppl_page *new_page = new_file_page(mmap_fh->file, offset, zero_after, true, FILE);
 
-    new_page->location = MMAP;
-
-    origin->source_file = mmap_fh->file;
-    origin->offset = i * PGSIZE;
-    origin->zero_after = ( i == pages - 1) ? fl%PGSIZE : PGSIZE;
-    origin->writable = true;
-    origin->location = MMAP;
-
-    new_page->origin = origin;
-    new_page->swap_elem = NULL;
     void * overlapControl = pagedir_get_page(t->pagedir, upage + i*PGSIZE);
     if( overlapControl != NULL ){
       f->eax = -1;
       return;
     }
-    pagedir_set_page_suppl (t->pagedir, upage + i*PGSIZE, new_page);
+    pagedir_set_page_suppl (t->pagedir, upage + offset, new_page);
   }
 
   f->eax = mmap_fd;

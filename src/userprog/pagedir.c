@@ -6,6 +6,7 @@
 #include "threads/init.h"
 #include "threads/pte.h"
 #include "threads/palloc.h"
+#include "threads/malloc.h"
 #include "vm/frame.h"
 
 static uint32_t *active_pd (void);
@@ -43,12 +44,17 @@ pagedir_destroy (uint32_t *pd)
         uint32_t *pte;
 
         for (pte = pt; pte < pt + PGSIZE / sizeof *pte; pte++)
-          if (*pte & PTE_P) {
+          if ((*pte & PTE_P) != 0) {
             uint32_t *ppt = pte_get_page (*pte);
             //printf("freeing address %p, content 0x%x\n", ppt, *ppt);
             frame_free(ppt);
             //freed = frame_free (ppt);
             //if(!freed)palloc_free_page (ppt);
+          } else if (*pte != 0) {
+            struct suppl_page * page = (struct suppl_page *) *pte;
+            if(page->location == SWAP)
+                swap_free (page->swap_elem);
+            free (page);
           }
         freed = frame_free (pt);
         //if(!freed)palloc_free_page (pt);

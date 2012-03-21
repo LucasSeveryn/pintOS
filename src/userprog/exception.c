@@ -170,7 +170,7 @@ page_fault (struct intr_frame *f)
   {
     f->eip = (void (*) (void)) f->eax;
     f->eax = 0xffffffff;
-    syscall_t_exit (t->name, -2);
+    syscall_t_exit (t->name, -1);
   }
 
   bool writable = true;
@@ -185,7 +185,6 @@ page_fault (struct intr_frame *f)
     switch (page->location)
     {
       case EXEC:
-      case MMAP:
       case FILE:
         filesys_lock_acquire();
         file_seek (page->origin->source_file, page->origin->offset);
@@ -203,6 +202,7 @@ page_fault (struct intr_frame *f)
         break;
       case SWAP:
         swap_load( kpage, page->swap_elem );
+        dirty = true;
         break;
       case ZERO:
         memset (kpage, 0, PGSIZE);

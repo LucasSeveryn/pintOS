@@ -7,15 +7,14 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
-#define STACK_BOTTOM ((void *) 0xbf800000)
+#define STACK_BOTTOM ((void *) (PHYS_BASE - (8 * 1024 * 1024)))
 
 enum page_type
 	{
 		FILE,
 		EXEC,
 		SWAP,
-		ZERO,
-		MMAP
+		ZERO
 	};
 
 struct suppl_page
@@ -40,6 +39,6 @@ struct origin_info
 struct suppl_page * new_file_page (struct file *, off_t, size_t, bool, enum page_type);
 struct suppl_page * new_swap_page (struct swap_slt *);
 struct suppl_page * new_zero_page (void);
-inline bool is_stack_access(void *esp, void *address);
+inline bool is_stack_access(void *, void *);
 
 #endif /* vm/page.h */
