@@ -219,5 +219,6 @@ page_fault (struct intr_frame *f)
     frame_free (kpage);
     syscall_t_exit (t->name, -1);
   }
+  //printf("Virtual address %p points to %p\n", fault_page, kpage);
   pagedir_set_dirty (t->pagedir, fault_page, dirty);
 }

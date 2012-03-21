@@ -1,5 +1,5 @@
 #include "vm/frame.h"
-
+#include <stdio.h>
 #include "threads/synch.h"
 #include "threads/palloc.h"
 #include "threads/malloc.h"
@@ -39,7 +39,8 @@ frame_get (void * upage, bool zero, struct origin_info *origin){
 
 	/* There is no more free memory, we need to free some */
 	if( kpage == NULL ) {
-		kpage = evict( upage, t );
+		evict( upage, t );
+		kpage = palloc_get_page ( PAL_USER | (zero ? PAL_ZERO : 0) );
 	}
 
 	/* We succesfully allocated space for the page */
@@ -70,12 +71,12 @@ frame_free (void * addr){
 		frame = hash_entry (found_frame, struct frame, hash_elem);
 
 		lock_frames();
+		//printf("Freeing virtual address %p and physical %p\n\n", frame->upage, frame->addr);
 		palloc_free_page (frame->addr);
 		hash_delete ( &frames, &frame->hash_elem );
 		//free (frame->addr);
 		free (frame);
 		unlock_frames();
-
 
 		return true;
 	} else {
@@ -149,7 +150,7 @@ page_dump( uint32_t * pd, void * upage, struct frame * frame ){
 	pagedir_set_accessed ( pd, upage, false );
 }
 
-void *
+void
 evict( void * upage, struct thread * th ){
 	struct hash_iterator it;
 	uint32_t * pd = th->pagedir;
@@ -162,7 +163,7 @@ evict( void * upage, struct thread * th ){
 			struct frame *f = hash_entry (hash_cur (&it), struct frame, hash_elem);
 			int class = get_class (pd, upage);
 			if( class == 1 ){
-				page_dump (pd, upage, f);
+				page_dump (f->thread->pagedir, upage, f);
 				kpage = f->addr;
 			}
 		}
@@ -172,13 +173,14 @@ evict( void * upage, struct thread * th ){
 			struct frame *f = hash_entry (hash_cur (&it), struct frame, hash_elem);
 			int class = get_class (pd, upage);
 			if( class == 3 ){
-				page_dump (pd, upage, f);
+				page_dump (f->thread->pagedir, upage, f);
 				kpage = f->addr;
 			}
 			pagedir_set_accessed (pd, upage, false);
 		}
 	}
 
+	//printf("kpage: %p\n", kpage);
+	//printf("Current mapping for %p is %p\n", upage, pagedir_get_page(pd, upage));
 	frame_free (kpage);
-	return kpage;
 }

@@ -1,6 +1,7 @@
 #include "userprog/pagedir.h"
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdio.h>
 #include <string.h>
 #include "threads/init.h"
 #include "threads/pte.h"
@@ -44,11 +45,13 @@ pagedir_destroy (uint32_t *pd)
         for (pte = pt; pte < pt + PGSIZE / sizeof *pte; pte++)
           if (*pte & PTE_P) {
             uint32_t *ppt = pte_get_page (*pte);
+            //printf("freeing address %p, content 0x%x\n", ppt, *ppt);
+            frame_free(ppt);
             //freed = frame_free (ppt);
-            if(!freed)palloc_free_page (ppt);
+            //if(!freed)palloc_free_page (ppt);
           }
-        //freed = frame_free (pt);
-        if(!freed)palloc_free_page (pt);
+        freed = frame_free (pt);
+        //if(!freed)palloc_free_page (pt);
       }
   palloc_free_page (pd);
 }
@@ -184,8 +187,7 @@ pagedir_get_page (uint32_t *pd, const void *uaddr)
 }
 
 /* Marks user virtual page UPAGE "not present" in page
-   directory PD.  Later accesses to the page will fault.  Other
-   bits in the page table entry are preserved.
+   directory PD.  Later accesses to the page will fault.
    UPAGE need not be mapped. */
 void
 pagedir_clear_page (uint32_t *pd, void *upage)
@@ -196,7 +198,7 @@ pagedir_clear_page (uint32_t *pd, void *upage)
   ASSERT (is_user_vaddr (upage));
 
   pte = lookup_page (pd, upage, false);
-  if (pte != NULL && (*pte & PTE_P) != 0)
+  if (pte != NULL)
     {
       *pte = 0;
       invalidate_pagedir (pd);
