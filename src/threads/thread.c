@@ -541,7 +541,6 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 thread_set_waiting_thread_priority (struct thread *t, int new_priority)
 {
-
   if (t->base_priority >= new_priority)
     t->is_donated = false;
   else
@@ -580,8 +579,6 @@ thread_set_priority (int new_priority)
   if (!t->is_donated)
     t->priority = new_priority;
 
-  intr_set_level (old_level);
-
   if (!ps_empty (&ready_ps))
   {
     th = ps_pull (&ready_ps);
@@ -590,6 +587,7 @@ thread_set_priority (int new_priority)
         thread_yield();
     }
   }
+  intr_set_level (old_level);
 }
 
 /* Returns the current thread's priority. */

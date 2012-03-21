@@ -9,7 +9,8 @@
 
 static struct hash frames;
 static struct lock frames_lock;
-static
+
+static bool DEBUG = false;
 
 void lock_frames (void);
 void unlock_frames (void);
@@ -180,7 +181,7 @@ evict( void * upage, struct thread * th ){
 		}
 	}
 
-	//printf("kpage: %p\n", kpage);
-	//printf("Current mapping for %p is %p\n", upage, pagedir_get_page(pd, upage));
+	if(DEBUG)printf("kpage: %p\n", kpage);
+	if(DEBUG)printf("Current mapping for %p is %p\n", upage, pagedir_get_page(pd, upage));
 	frame_free (kpage);
 }

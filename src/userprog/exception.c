@@ -11,7 +11,8 @@
 #include "vm/swap.h"
 #include "vm/page.h"
 #include "vm/frame.h"
-#include "vm/page.h"
+
+static bool DEBUG = false;
 
 /* Number of page faults processed. */
 static long long page_fault_cnt;
@@ -169,7 +170,7 @@ page_fault (struct intr_frame *f)
   {
     f->eip = (void (*) (void)) f->eax;
     f->eax = 0xffffffff;
-    syscall_t_exit (t->name, -1);
+    syscall_t_exit (t->name, -2);
   }
 
   bool writable = true;
@@ -219,6 +220,6 @@ page_fault (struct intr_frame *f)
     frame_free (kpage);
     syscall_t_exit (t->name, -1);
   }
-  //printf("Virtual address %p points to %p\n", fault_page, kpage);
+  if(DEBUG)printf("Virtual address %p points to %p\n", fault_page, kpage);
   pagedir_set_dirty (t->pagedir, fault_page, dirty);
 }
