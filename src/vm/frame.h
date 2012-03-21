@@ -15,7 +15,7 @@ struct frame{
 };
 
 void frame_init(void);
-void *evict(void *, struct thread *);
+void evict(void *, struct thread *);
 void *frame_get(void *, bool, struct origin_info * );
 bool frame_free(void *);
 struct frame *frame_find(void *);
