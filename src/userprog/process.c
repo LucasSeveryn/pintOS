@@ -580,7 +580,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       } else {
         new_page = new_file_page(file, current_ofs, page_read_bytes, writable, EXEC);
       }
-      if(DEBUG)printf("allocating address %p to address: %p\n", upage, new_page);
+      if(DEBUG)printf("Allocating address %p to address: %p\n", upage, new_page);
       /* Add the page to the process's address space. */
       if (!install_page_suppl (upage, new_page))
         {
@@ -634,7 +634,7 @@ install_page (void *upage, void *kpage, bool writable)
 
   /* Verify that there's not already a page at that virtual
      address, then map our page there. */
-  return (pagedir_get_page (t->pagedir, upage) == NULL
+  return (pagedir_get_page (t->pagedir, upage) == 0
           && pagedir_set_page (t->pagedir, upage, kpage, writable));
 }
 

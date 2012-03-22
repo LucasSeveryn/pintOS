@@ -17,7 +17,7 @@ void lock_frames (void);
 void unlock_frames (void);
 bool frame_less (const struct hash_elem *, const struct hash_elem *, void *);
 unsigned frame_hash (const struct hash_elem *, void *);
-void page_dump( uint32_t *, void *, struct frame * );
+void page_dump( struct frame * );
 
 void
 lock_frames (){
@@ -32,7 +32,7 @@ void
 frame_init (){
 	hash_init (&frames, frame_hash, frame_less, NULL);
 	lock_init (&frames_lock);
-	lock_init (&eviction_lock);
+	//lock_init (&eviction_lock);
 }
 
 void *
@@ -42,10 +42,10 @@ frame_get (void * upage, bool zero, struct origin_info *origin){
 
 	/* There is no more free memory, we need to free some */
 	if( kpage == NULL ) {
-		lock_acquire (&eviction_lock);
-		evict( upage, t );
+		lock_frames();
+		evict();
 		kpage = palloc_get_page ( PAL_USER | (zero ? PAL_ZERO : 0) );
-		lock_release (&eviction_lock);
+		unlock_frames();
 	}
 
 	/* We succesfully allocated space for the page */
@@ -128,21 +128,24 @@ get_class( uint32_t * pd, const void * page ){
 }
 
 void
-page_dump( uint32_t * pd, void * upage, struct frame * frame ){
+page_dump( struct frame * frame ){
 	bool dirty = pagedir_is_dirty ( frame->thread->pagedir, frame->upage );
-	struct suppl_page * suppl_page;
-	struct thread * t = thread_current();
+	struct suppl_page * suppl_page = NULL;
+
+	if(DEBUG)printf("We decided to evict address %p with mapping %p\n", frame->upage, pagedir_get_page(frame->thread->pagedir, frame->upage));
 
 	if (dirty)
 	{
 		if (frame->origin != NULL && frame->origin->location == FILE)
 		{
+			if(DEBUG)printf("write to disk\n");
 			filesys_lock_acquire ();
 			file_write_at (frame->origin->source_file, frame->addr, frame->origin->zero_after, frame->origin->offset);
 			filesys_lock_release ();
 
 			suppl_page = new_file_page (frame->origin->source_file, frame->origin->offset, frame->origin->zero_after, frame->origin->writable, FILE);
 		} else {
+			if(DEBUG)printf("write to swap\n");
 			struct swap_slt * swap_el = swap_slot( frame );
 			swap_store ( swap_el );
 			suppl_page = new_swap_page ( swap_el );
@@ -152,39 +155,43 @@ page_dump( uint32_t * pd, void * upage, struct frame * frame ){
 	{
 		if (frame->origin != NULL)
 		{
+			if(DEBUG)printf("discard file\n");
 			suppl_page = new_file_page (frame->origin->source_file, frame->origin->offset, frame->origin->zero_after, frame->origin->writable, frame->origin->location);
 		} else {
+			if(DEBUG)printf("discard zero\n");
 			suppl_page = new_zero_page ();
 		}
 	}
 
+	if(DEBUG) printf("Supplementary info are located at: %p\n", (void *)suppl_page);
+
 	sema_down (frame->thread->pagedir_mod);
-	pagedir_clear_page ( frame->thread->pagedir, upage );
-	pagedir_set_page_suppl ( frame->thread->pagedir, upage, suppl_page );
-	pagedir_set_accessed ( frame->thread->pagedir, upage, false );
+	pagedir_clear_page ( frame->thread->pagedir, frame->upage );
+	pagedir_set_page_suppl ( frame->thread->pagedir, frame->upage, suppl_page );
+	//pagedir_set_accessed ( frame->thread->pagedir, frame->upage, false );
 	sema_up (frame->thread->pagedir_mod);
 
 }
 
 void
-evict( void * upage, struct thread * th ){
+evict(){
 	struct hash_iterator it;
-	uint32_t * pd = th->pagedir;
 	void * kpage = NULL;
+	struct frame *f = NULL;
 	int i;
 
-	lock_frames();
-	
+	if(DEBUG) printf("We need to evict a page!\n");
+
 	//Second chance page replacement
 	for( i = 0; i < 2 && kpage == NULL; i++ ){
 		hash_first (&it, &frames);
 
 		//Look for an element in the lowest class
 		while(kpage == NULL && hash_next (&it)){
-			struct frame *f = hash_entry (hash_cur (&it), struct frame, hash_elem);
-			int class = get_class (f->thread->pagedir, upage);
+			f = hash_entry (hash_cur (&it), struct frame, hash_elem);
+			int class = get_class (f->thread->pagedir, f->upage);
 			if( class == 1 ){
-				page_dump (pd, upage, f);
+				page_dump (f);
 				kpage = f->addr;
 			}
 		}
@@ -193,20 +200,20 @@ evict( void * upage, struct thread * th ){
 
 		//Look for an element in the higher class, at the same time lowering classes of passed elements
 		while(kpage == NULL && hash_next (&it)){
-			struct frame *f = hash_entry (hash_cur (&it), struct frame, hash_elem);
-			int class = get_class (f->thread->pagedir, upage);
+			f = hash_entry (hash_cur (&it), struct frame, hash_elem);
+			int class = get_class (f->thread->pagedir, f->upage);
 			if( class == 3 ){
-				page_dump (pd, upage, f);
+				page_dump (f);
 				kpage = f->addr;
 			} else {
-				pagedir_set_accessed (f->thread->pagedir, upage, false);
+				pagedir_set_accessed (f->thread->pagedir, f->upage, false);
 			}
 		}
 	}
 
-	unlock_frames();
-
-	//printf("kpage: %p\n", kpage);
-	//printf("Current mapping for %p is %p\n", upage, pagedir_get_page(pd, upage));
-	frame_free (kpage);
+	if(DEBUG)printf("After eviction current mapping for %p is %p\n", f->upage, pagedir_get_page(f->thread->pagedir, f->upage));
+	palloc_free_page (f->addr); //Free physical memory
+	hash_delete ( &frames, &f->hash_elem ); //Free entry in the frame table
+	free (f); //Delete the structure
+	//frame_free (kpage);
 }
