@@ -4,8 +4,6 @@
 #include <list.h>
 #include <stdbool.h>
 
-bool order_by_priority (const struct list_elem *, const struct list_elem *, void *);
-
 /* A counting semaphore. */
 struct semaphore 
   {
@@ -24,7 +22,6 @@ struct lock
   {
     struct thread *holder;      /* Thread holding lock (for debugging). */
     struct semaphore semaphore; /* Binary semaphore controlling access. */
-	  struct list_elem lock_elem; /* List element for held locks by thread. */
   };
 
 void lock_init (struct lock *);
@@ -33,17 +30,11 @@ bool lock_try_acquire (struct lock *);
 void lock_release (struct lock *);
 bool lock_held_by_current_thread (const struct lock *);
 
-/* Functions for recomputing priorities */
-void donate_priority (const struct lock *);
-int recompute_priority (void);
-
 /* Condition variable. */
 struct condition 
   {
     struct list waiters;        /* List of waiting semaphore_elems. */
   };
-
-bool order_by_waiting_priority (const struct list_elem *, const struct list_elem *, void *);
 
 void cond_init (struct condition *);
 void cond_wait (struct condition *, struct lock *);

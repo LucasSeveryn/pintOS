@@ -9,7 +9,6 @@
 
 static struct hash frames;
 static struct lock frames_lock;
-static struct lock eviction_lock;
 
 static bool DEBUG = false;
 
@@ -32,7 +31,6 @@ void
 frame_init (){
 	hash_init (&frames, frame_hash, frame_less, NULL);
 	lock_init (&frames_lock);
-	//lock_init (&eviction_lock);
 }
 
 void *
