@@ -61,7 +61,7 @@ pagedir_destroy (uint32_t *pd)
              free (page->origin);
             free (page);
           } else {
-            if(DEBUG) printf("Empty address %p", *pte);
+            if(DEBUG) printf("Empty address 0x%x\n", *pte);
           }
         palloc_free_page (pt);
         //if(!freed)palloc_free_page (pt);
