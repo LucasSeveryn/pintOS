@@ -44,16 +44,19 @@ pagedir_destroy (uint32_t *pd)
         uint32_t *pte;
 
         for (pte = pt; pte < pt + PGSIZE / sizeof *pte; pte++)
-          if ((*pte & PTE_P) != 0) {
+          if (*pte & PTE_P) {
             uint32_t *ppt = pte_get_page (*pte);
-            //printf("freeing address %p, content 0x%x\n", ppt, *ppt);
+       //     printf("freeing address %p, content 0x%x\n", ppt, *ppt);
             frame_free(ppt);
             //freed = frame_free (ppt);
             //if(!freed)palloc_free_page (ppt);
           } else if (*pte != 0) {
             struct suppl_page * page = (struct suppl_page *) *pte;
+         //   printf ("supplementary page table address 0x%x\n", *pte);
             if(page->location == SWAP)
                 swap_free (page->swap_elem);
+            if (page->origin != 0)
+              free (page->origin);
             free (page);
           }
         freed = frame_free (pt);
