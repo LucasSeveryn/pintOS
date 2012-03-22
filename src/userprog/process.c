@@ -99,6 +99,9 @@ start_process (void *file_name_)
   char *file_name = file_name_;
   struct intr_frame if_;
   struct thread * cur = thread_current ();
+  cur->pagedir_mod = malloc (sizeof (struct semaphore));
+  sema_init (cur->pagedir_mod, 1);
+
   bool success;
   char *rest;
   char *token;
@@ -283,6 +286,7 @@ process_exit (void)
       pagedir_destroy (pd);
     }
 
+  free(cur->pagedir_mod);
   if(cur->child_alive != NULL) sema_up (cur->child_alive);
 }
 

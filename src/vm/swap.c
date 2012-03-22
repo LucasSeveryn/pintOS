@@ -1,12 +1,15 @@
 #include "vm/swap.h"
 #include "threads/malloc.h"
+#include "threads/synch.h"
 
 #include <bitmap.h>
 #include <hash.h>
 #include <debug.h>
+#include <stdio.h>
 
 /* Swap partition */
 static struct block *swap;
+static struct lock swap_lock;
 unsigned swap_size;
 
 /* Bitmap of free swap slots. */
@@ -26,7 +29,11 @@ swap_find_free ()
 {
 	bool full = bitmap_all (free_swap_bitmap, 0, swap_size);
 	if( ! full ){
-		return bitmap_scan (free_swap_bitmap, 0, PGSIZE / BLOCK_SECTOR_SIZE, false);
+		lock_acquire (&swap_lock);
+		block_sector_t first_free = bitmap_scan_and_flip (free_swap_bitmap, 0, PGSIZE / BLOCK_SECTOR_SIZE, false);
+		lock_release (&swap_lock);
+
+		return first_free;
 	} else {
 		PANIC("SWAP is full! Memory exhausted.");
 	}
@@ -43,7 +50,6 @@ swap_store (struct swap_slt * swap_slt)
 		block_write ( swap, swap_addr + i, swap_slt -> frame -> addr + i * BLOCK_SECTOR_SIZE );
 
 	swap_slt -> swap_addr = swap_addr;
-	bitmap_set_multiple ( free_swap_bitmap, swap_addr, PGSIZE / BLOCK_SECTOR_SIZE, true );
 }
 
 void
@@ -52,18 +58,18 @@ swap_load (void *addr, struct swap_slt * swap_slt)
 	int i;
 	for( i = 0; i < PGSIZE / BLOCK_SECTOR_SIZE; i++ )
 		block_read( swap, swap_slt->swap_addr + i, addr + i * BLOCK_SECTOR_SIZE );
+
 	bitmap_set_multiple ( free_swap_bitmap, swap_slt->swap_addr, PGSIZE / BLOCK_SECTOR_SIZE, false );
 }
 
 void
-swap_free (struct swap_slt * swap_slt)
-{
-
+swap_free(struct swap_slt * swap_slt){
+	bitmap_set_multiple ( free_swap_bitmap, swap_slt->swap_addr, PGSIZE / BLOCK_SECTOR_SIZE, false );
 }
 
-void swap_init()
-{
+void swap_init(){
 	swap = block_get_role (BLOCK_SWAP);
 	swap_size = block_size (swap);
+	lock_init (&swap_lock);
 	free_swap_bitmap = bitmap_create (swap_size);
 }

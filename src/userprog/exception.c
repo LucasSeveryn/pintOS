@@ -8,6 +8,7 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "threads/pte.h"
+#include "threads/synch.h"
 #include "vm/swap.h"
 #include "vm/page.h"
 #include "vm/frame.h"
@@ -162,8 +163,11 @@ page_fault (struct intr_frame *f)
   if (!is_user_vaddr(fault_addr))
     syscall_t_exit (t->name, -1);
 
+  sema_down (t->pagedir_mod);
   void *ret_page = pagedir_get_page(t->pagedir, fault_addr);
-  //printf("faulted address: %p\n supp info: %p\n", fault_addr, ret_page);
+  sema_up (t->pagedir_mod);
+
+  //printf("t: %p faulted address: %p\n supp info: %p\n", t, fault_addr, ret_page);
   void *esp = f->cs == SEL_KCSEG ? t->esp : f->esp;
   bool stack_access = is_stack_access (esp, fault_addr);
   if (ret_page == NULL && !stack_access)
@@ -213,13 +217,16 @@ page_fault (struct intr_frame *f)
   if (kpage == NULL) {
     kpage = frame_get (fault_page, true, NULL);
   }
+  sema_down (t->pagedir_mod);
   pagedir_clear_page (t->pagedir, fault_page);
   /* Add the page to the process's address space. */
   if (!pagedir_set_page (t->pagedir, fault_page, kpage, writable))
   {
+    sema_up (t->pagedir_mod);
     frame_free (kpage);
     syscall_t_exit (t->name, -1);
   }
   if(DEBUG)printf("Virtual address %p points to %p\n", fault_page, kpage);
   pagedir_set_dirty (t->pagedir, fault_page, dirty);
+  sema_up (t->pagedir_mod);
 }

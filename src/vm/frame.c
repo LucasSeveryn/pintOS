@@ -9,6 +9,7 @@
 
 static struct hash frames;
 static struct lock frames_lock;
+static struct lock eviction_lock;
 
 static bool DEBUG = false;
 
@@ -31,6 +32,7 @@ void
 frame_init (){
 	hash_init (&frames, frame_hash, frame_less, NULL);
 	lock_init (&frames_lock);
+	lock_init (&eviction_lock);
 }
 
 void *
@@ -40,8 +42,10 @@ frame_get (void * upage, bool zero, struct origin_info *origin){
 
 	/* There is no more free memory, we need to free some */
 	if( kpage == NULL ) {
+		lock_acquire (&eviction_lock);
 		evict( upage, t );
 		kpage = palloc_get_page ( PAL_USER | (zero ? PAL_ZERO : 0) );
+		lock_release (&eviction_lock);
 	}
 
 	/* We succesfully allocated space for the page */
@@ -67,17 +71,15 @@ frame_free (void * addr){
 	struct frame frame_elem;
 	frame_elem.addr = addr;
 
-	found_frame = hash_find(&frames, &frame_elem.hash_elem);
+	found_frame = hash_find (&frames, &frame_elem.hash_elem);
 	if( found_frame != NULL ){
 		frame = hash_entry (found_frame, struct frame, hash_elem);
 
-		lock_frames();
-		//printf("Freeing virtual address %p and physical %p\n\n", frame->upage, frame->addr);
-		palloc_free_page (frame->addr);
-		hash_delete ( &frames, &frame->hash_elem );
-		//free (frame->addr);
-		free (frame);
-		unlock_frames();
+		lock_frames ();
+		palloc_free_page (frame->addr); //Free physical memory
+		hash_delete ( &frames, &frame->hash_elem ); //Free entry in the frame table
+		free (frame); //Delete the structure
+		unlock_frames ();
 
 		return true;
 	} else {
@@ -95,7 +97,6 @@ frame_find (void * addr){
 
 	found_frame = hash_find (&frames, &frame_elem.hash_elem);
 	if( found_frame != NULL ){
-		//Not locked for better performance
 		frame = hash_entry (found_frame, struct frame, hash_elem);
 		return frame;
 	} else {
@@ -128,8 +129,9 @@ get_class( uint32_t * pd, const void * page ){
 
 void
 page_dump( uint32_t * pd, void * upage, struct frame * frame ){
-	bool dirty = pagedir_is_dirty ( pd, upage );
+	bool dirty = pagedir_is_dirty ( frame->thread->pagedir, frame->upage );
 	struct suppl_page * suppl_page;
+	struct thread * t = thread_current();
 
 	if (dirty)
 	{
@@ -139,7 +141,7 @@ page_dump( uint32_t * pd, void * upage, struct frame * frame ){
 			file_write_at (frame->origin->source_file, frame->addr, frame->origin->zero_after, frame->origin->offset);
 			filesys_lock_release ();
 
-			suppl_page = new_file_page(frame->origin->source_file, frame->origin->offset, frame->origin->zero_after, frame->origin->writable, FILE);
+			suppl_page = new_file_page (frame->origin->source_file, frame->origin->offset, frame->origin->zero_after, frame->origin->writable, FILE);
 		} else {
 			struct swap_slt * swap_el = swap_slot( frame );
 			swap_store ( swap_el );
@@ -150,15 +152,18 @@ page_dump( uint32_t * pd, void * upage, struct frame * frame ){
 	{
 		if (frame->origin != NULL)
 		{
-			suppl_page = new_file_page(frame->origin->source_file, frame->origin->offset, frame->origin->zero_after, frame->origin->writable, frame->origin->location);
+			suppl_page = new_file_page (frame->origin->source_file, frame->origin->offset, frame->origin->zero_after, frame->origin->writable, frame->origin->location);
 		} else {
 			suppl_page = new_zero_page ();
 		}
 	}
 
-	pagedir_clear_page ( pd, upage );
-	pagedir_set_page_suppl ( pd, upage, suppl_page );
-	pagedir_set_accessed ( pd, upage, false );
+	sema_down (frame->thread->pagedir_mod);
+	pagedir_clear_page ( frame->thread->pagedir, upage );
+	pagedir_set_page_suppl ( frame->thread->pagedir, upage, suppl_page );
+	pagedir_set_accessed ( frame->thread->pagedir, upage, false );
+	sema_up (frame->thread->pagedir_mod);
+
 }
 
 void
@@ -168,30 +173,40 @@ evict( void * upage, struct thread * th ){
 	void * kpage = NULL;
 	int i;
 
+	lock_frames();
+	
+	//Second chance page replacement
 	for( i = 0; i < 2 && kpage == NULL; i++ ){
 		hash_first (&it, &frames);
+
+		//Look for an element in the lowest class
 		while(kpage == NULL && hash_next (&it)){
 			struct frame *f = hash_entry (hash_cur (&it), struct frame, hash_elem);
-			int class = get_class (pd, upage);
+			int class = get_class (f->thread->pagedir, upage);
 			if( class == 1 ){
-				page_dump (f->thread->pagedir, upage, f);
+				page_dump (pd, upage, f);
 				kpage = f->addr;
 			}
 		}
 
 		hash_first (&it, &frames);
+
+		//Look for an element in the higher class, at the same time lowering classes of passed elements
 		while(kpage == NULL && hash_next (&it)){
 			struct frame *f = hash_entry (hash_cur (&it), struct frame, hash_elem);
-			int class = get_class (pd, upage);
+			int class = get_class (f->thread->pagedir, upage);
 			if( class == 3 ){
-				page_dump (f->thread->pagedir, upage, f);
+				page_dump (pd, upage, f);
 				kpage = f->addr;
+			} else {
+				pagedir_set_accessed (f->thread->pagedir, upage, false);
 			}
-			pagedir_set_accessed (pd, upage, false);
 		}
 	}
 
-	if(DEBUG)printf("kpage: %p\n", kpage);
-	if(DEBUG)printf("Current mapping for %p is %p\n", upage, pagedir_get_page(pd, upage));
+	unlock_frames();
+
+	//printf("kpage: %p\n", kpage);
+	//printf("Current mapping for %p is %p\n", upage, pagedir_get_page(pd, upage));
 	frame_free (kpage);
 }

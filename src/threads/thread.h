@@ -135,6 +135,7 @@ struct thread
     int ret;                            /* return status of the process */
     struct semaphore * child_alive;     /* smaphore indicating that child have not died yet */
     struct semaphore * child_loading;   /* semaphore indicating if the child is still loading*/
+    struct semaphore * pagedir_mod;   /* semaphore indicating if the child is still loading*/
 
     struct thread * parent;             /* parent of the thread */
     struct list_elem child;             /* element of parent's list of children*/
