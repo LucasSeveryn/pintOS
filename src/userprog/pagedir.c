@@ -55,11 +55,11 @@ pagedir_destroy (uint32_t *pd)
           } else if (*pte != 0) {
             struct suppl_page * page = (struct suppl_page *) *pte;
             if(DEBUG)printf ("supplementary page table address %p, content 0x%x\n", pte, *pte);
-              if(page->location == SWAP)
-                  swap_free (page->swap_elem);
-              if (page->origin != 0)
-                free (page->origin);
-              free (page);
+            if(page->location == SWAP)
+              swap_free (page->swap_elem);
+            if (page->origin != 0)
+             free (page->origin);
+            free (page);
           }
         palloc_free_page (pt);
         //if(!freed)palloc_free_page (pt);

@@ -283,7 +283,9 @@ process_exit (void)
          that's been freed (and cleared). */
       cur->pagedir = NULL;
       pagedir_activate (NULL);
+      sema_down(cur->pagedir_mod);
       pagedir_destroy (pd);
+      sema_up(cur->pagedir_mod);
     }
 
   free(cur->pagedir_mod);
