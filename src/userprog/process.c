@@ -281,9 +281,9 @@ process_exit (void)
          directory before destroying the process's page
          directory, or our active page directory will be one
          that's been freed (and cleared). */
+      sema_down(cur->pagedir_mod);
       cur->pagedir = NULL;
       pagedir_activate (NULL);
-      sema_down(cur->pagedir_mod);
       pagedir_destroy (pd);
       sema_up(cur->pagedir_mod);
     }
