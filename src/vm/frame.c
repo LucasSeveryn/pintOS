@@ -102,7 +102,7 @@ frame_pin (void * vaddr, int l){
 	if( l % PGSIZE ) it++;
 	for( i = 0; i < it; i++ ){
 		void * kpage = pagedir_get_page (t->pagedir, pg_round_down(vaddr) + i * PGSIZE);
-		if( kpage == NULL ) return;
+		if( pg_ofs(kpage) != 0 ) return;
 		frame_set_pin (kpage, true);
 	}
 }
@@ -115,7 +115,7 @@ frame_unpin (void * vaddr, int l){
 	if( l % PGSIZE ) it++;
 	for( i = 0; i < it; i++ ){
 		void * kpage = pagedir_get_page (t->pagedir, pg_round_down(vaddr) + i * PGSIZE);
-		if( kpage == NULL ) return;
+		if( pg_ofs(kpage) != 0 ) return;
 	    frame_set_pin (kpage, false);
 	}
 }
@@ -125,7 +125,7 @@ frame_pin_kernel (void * kpage, int l){
 	int it = l / PGSIZE;
 	if( l % PGSIZE ) it++;
 	for( i = 0; i < it; i++ ){
-		if( kpage == NULL ) return;
+		if( pg_ofs(kpage) != 0 ) return;
 	    frame_set_pin (kpage, true);
 	}
 }
@@ -136,7 +136,7 @@ frame_unpin_kernel (void * kpage, int l){
 	int it = l / PGSIZE;
 	if( l % PGSIZE ) it++;
 	for( i = 0; i < it; i++ ){
-	    if( kpage == NULL ) return;
+	    if( pg_ofs(kpage) != 0 ) return;
 	    frame_set_pin (kpage, false);
 	}
 }
