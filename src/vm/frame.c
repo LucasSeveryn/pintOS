@@ -85,6 +85,9 @@ frame_free (void * addr){
 	}
 }
 
+/*
+Sets frame's pin to the given value
+*/
 void frame_set_pin (void *, bool);
 
 void
@@ -94,6 +97,9 @@ frame_set_pin (void * kpage, bool pinval){
     frame->pinned = pinval;
 }
 
+/*
+Pins a frame using user virtual memory address
+*/
 void
 frame_pin (void * vaddr, int l){
 	struct thread * t = thread_current();
@@ -107,6 +113,9 @@ frame_pin (void * vaddr, int l){
 	}
 }
 
+/*
+Unpins a frame using user virtual memory address
+*/
 void 
 frame_unpin (void * vaddr, int l){
 	struct thread * t = thread_current();
@@ -119,6 +128,10 @@ frame_unpin (void * vaddr, int l){
 	    frame_set_pin (kpage, false);
 	}
 }
+
+/*
+Pins a frame using physical memory address
+*/
 void
 frame_pin_kernel (void * kpage, int l){
 	int i;
@@ -130,6 +143,9 @@ frame_pin_kernel (void * kpage, int l){
 	}
 }
 
+/*
+Unpins a frame using physical memory address
+*/
 void 
 frame_unpin_kernel (void * kpage, int l){
 	int i;
@@ -140,6 +156,10 @@ frame_unpin_kernel (void * kpage, int l){
 	    frame_set_pin (kpage, false);
 	}
 }
+
+/*
+Looks for a frame with the given physical address, if no such frame exists return NULL
+*/
 struct frame *
 frame_find (void * addr){
 	struct frame * frame;
@@ -156,6 +176,9 @@ frame_find (void * addr){
 	}
 }
 
+/*
+Comparision function
+*/
 bool
 frame_less (const struct hash_elem *a_, const struct hash_elem *b_	, void *aux UNUSED){
 	const struct frame * a = hash_entry (a_, struct frame, hash_elem);
@@ -163,12 +186,19 @@ frame_less (const struct hash_elem *a_, const struct hash_elem *b_	, void *aux U
 	return a->addr < b->addr;
 }
 
+/*
+Hash function
+*/
 unsigned
 frame_hash(const struct hash_elem *fe, void *aux UNUSED){
 	const struct frame * frame = hash_entry (fe, struct frame, hash_elem);
 	return hash_int ((unsigned)frame->addr); //Dirty conversion
 }
 
+
+/*
+Determines a class the page belongs to
+*/
 int get_class( uint32_t * , const void * );
 
 int
@@ -182,6 +212,10 @@ get_class( uint32_t * pd, const void * page ){
 	return (accessed) ? (( dirty ) ? 4 : 2) : (( dirty ) ? 3 : 1);
 }
 
+
+/*
+Performs actual eviction of a page.
+*/
 void
 page_dump( struct frame * frame ){
 	bool dirty = pagedir_is_dirty ( frame->thread->pagedir, frame->upage );
