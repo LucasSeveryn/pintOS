@@ -1,13 +1,11 @@
 #include "vm/frame.h"
+#include <stdio.h>
 #include "threads/synch.h"
 #include "threads/palloc.h"
 #include "threads/malloc.h"
 #include "threads/thread.h"
 #include "userprog/pagedir.h"
 #include "userprog/syscall.h"
-
-#include <debug.h>
-#include <stdio.h>
 
 static struct hash frames;
 static struct lock frames_lock;
@@ -76,11 +74,9 @@ frame_free (void * addr){
 	if( found_frame != NULL ){
 		frame = hash_entry (found_frame, struct frame, hash_elem);
 
-		lock_frames ();
 		palloc_free_page (frame->addr); //Free physical memory
 		hash_delete ( &frames, &frame->hash_elem ); //Free entry in the frame table
 		free (frame); //Delete the structure
-		unlock_frames ();
 
 		return true;
 	} else {
@@ -191,13 +187,16 @@ page_dump( struct frame * frame ){
 	bool dirty = pagedir_is_dirty ( frame->thread->pagedir, frame->upage );
 	struct suppl_page * suppl_page = NULL;
 
-	if(DEBUG)printf("We decided to evict address %p with mapping %p\n", frame->upage, pagedir_get_page(frame->thread->pagedir, frame->upage));
+	char * name = thread_current()->name;
+	tid_t tid = thread_current()->tid;
+
+	if(DEBUG)printf("(%s - %d) Evict %p with mapping %p from %s - %d\n", name, tid, frame->upage, pagedir_get_page(frame->thread->pagedir, frame->upage), frame->thread->name, frame->thread->tid);
 
 	if (dirty)
 	{
 		if (frame->origin != NULL && frame->origin->location == FILE)
 		{
-			if(DEBUG)printf("write to disk\n");
+			if(DEBUG)printf("(%s - %d) write to disk\n", name, tid);
 			filesys_lock_acquire ();
 			frame_pin (frame->upage, PGSIZE);
 			file_write_at (frame->origin->source_file, frame->addr, frame->origin->zero_after, frame->origin->offset);
@@ -206,7 +205,7 @@ page_dump( struct frame * frame ){
 
 			suppl_page = new_file_page (frame->origin->source_file, frame->origin->offset, frame->origin->zero_after, frame->origin->writable, FILE);
 		} else {
-			if(DEBUG)printf("write to swap\n");
+			if(DEBUG)printf("(%s - %d) write to swap\n", name, tid);
 			struct swap_slt * swap_el = swap_slot( frame );
 			
 			frame_pin (frame->upage, PGSIZE);
@@ -220,15 +219,15 @@ page_dump( struct frame * frame ){
 	{
 		if (frame->origin != NULL)
 		{
-			if(DEBUG)printf("discard file\n");
+			if(DEBUG)printf("(%s - %d) discard file\n", name, tid);
 			suppl_page = new_file_page (frame->origin->source_file, frame->origin->offset, frame->origin->zero_after, frame->origin->writable, frame->origin->location);
 		} else {
-			if(DEBUG)printf("discard zero\n");
+			if(DEBUG)printf("(%s - %d) discard zero\n", name, tid);
 			suppl_page = new_zero_page ();
 		}
 	}
 
-	if(DEBUG) printf("Supplementary info are located at: %p\n", (void *)suppl_page);
+	if(DEBUG) printf("(%s - %d) Supplementary info are located at: %p\n", name, tid, (void *)suppl_page);
 
 	sema_down (frame->thread->pagedir_mod);
 	pagedir_clear_page ( frame->thread->pagedir, frame->upage );
@@ -244,8 +243,9 @@ evict(){
 	void * kpage = NULL;
 	struct frame *f = NULL;
 	int i;
-
-	if(DEBUG) printf("We need to evict a page!\n");
+	char * name = thread_current()->name;
+	tid_t tid = thread_current()->tid;
+	if(DEBUG) printf("(%s - %d) We need to evict a page!\n", name, tid);
 
 	//Second chance page replacement
 	for( i = 0; i < 2 && kpage == NULL; i++ ){
@@ -254,14 +254,10 @@ evict(){
 		//Look for an element in the lowest class
 		while(kpage == NULL && hash_next (&it)){
 			f = hash_entry (hash_cur (&it), struct frame, hash_elem);
-			if( f->thread->pagedir == NULL ){
-				palloc_free_page (f->addr); //Free physical memory
-				hash_delete ( &frames, &f->hash_elem ); //Free entry in the frame table
-				free (f);
-				continue;
-			}
-			if( f->pinned ) continue;
+			if( f->pinned ) continue;			
+			sema_down (f->thread->pagedir_mod);
 			int class = get_class (f->thread->pagedir, f->upage);
+			sema_up (f->thread->pagedir_mod);
 			if( class == 1 ){
 				page_dump (f);
 				kpage = f->addr;
@@ -273,14 +269,10 @@ evict(){
 		//Look for an element in the higher class, at the same time lowering classes of passed elements
 		while(kpage == NULL && hash_next (&it)){
 			f = hash_entry (hash_cur (&it), struct frame, hash_elem);
-			if( f->thread->pagedir == NULL ){
-				palloc_free_page (f->addr); //Free physical memory
-				hash_delete ( &frames, &f->hash_elem ); //Free entry in the frame table
-				free (f);
-				continue;
-			}
-			if( f->pinned ) continue;
+			if( f->pinned ) continue;	
+			sema_down (f->thread->pagedir_mod);
 			int class = get_class (f->thread->pagedir, f->upage);
+			sema_up (f->thread->pagedir_mod);
 			if( class == 3 ){
 				page_dump (f);
 				kpage = f->addr;
@@ -289,7 +281,8 @@ evict(){
 			}
 		}
 	}
-	if(DEBUG)printf("After eviction current mapping for %p is %p\n", f->upage, pagedir_get_page(f->thread->pagedir, f->upage));
+
+	if(DEBUG)printf("(%s - %d) After eviction current mapping for %p is %p\n", name, tid, f->upage, pagedir_get_page(f->thread->pagedir, f->upage));
 	palloc_free_page (f->addr); //Free physical memory
 	hash_delete ( &frames, &f->hash_elem ); //Free entry in the frame table
 	free (f); //Delete the structure

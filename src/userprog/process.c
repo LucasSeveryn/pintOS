@@ -281,11 +281,11 @@ process_exit (void)
          directory before destroying the process's page
          directory, or our active page directory will be one
          that's been freed (and cleared). */
-      sema_down(cur->pagedir_mod);
+      lock_frames();
       cur->pagedir = NULL;
       pagedir_activate (NULL);
       pagedir_destroy (pd);
-      sema_up(cur->pagedir_mod);
+      unlock_frames();
     }
 
   free(cur->pagedir_mod);
@@ -566,6 +566,8 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
   ASSERT (ofs % PGSIZE == 0);
 
   off_t current_ofs = ofs;
+  char * name = thread_current()->name;
+  tid_t tid = thread_current()->tid;
 
   while (read_bytes > 0 || zero_bytes > 0)
     {
@@ -582,7 +584,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       } else {
         new_page = new_file_page(file, current_ofs, page_read_bytes, writable, EXEC);
       }
-      if(DEBUG)printf("Allocating address %p to address: %p\n", upage, new_page);
+      if(DEBUG)printf("(%s - %d) Allocating address %p to address: %p\n", name, tid, upage, new_page);
       /* Add the page to the process's address space. */
       if (!install_page_suppl (upage, new_page))
         {
@@ -614,8 +616,11 @@ setup_stack (void **esp)
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
       if (success)
         *esp = PHYS_BASE;
-      else
+      else {
+        lock_frames();
         frame_free (kpage);
+        unlock_frames();
+      }
     }
   return success;
 }

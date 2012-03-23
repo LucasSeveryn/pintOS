@@ -13,7 +13,6 @@
 #include "devices/input.h"
 #include "vm/page.h"
 #include "vm/frame.h"
-#include "vm/read_buffer.h"
 
 #include "userprog/pagedir.h"
 #include <kernel/stdio.h>
@@ -298,9 +297,9 @@ syscall_read (int *args, struct intr_frame *f )
     off_t written = file_read (fh->file, br, args[3]);
     filesys_lock_release ();
 
-    frame_pin_kernel (buffer, args[3]);
+    frame_pin (buffer, args[3]);
     memcpy (buffer, br, args[3]);
-    frame_unpin_kernel (buffer, args[3]);
+    frame_unpin (buffer, args[3]);
     free(br);
     
     f->eax = written;

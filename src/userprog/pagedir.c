@@ -5,6 +5,7 @@
 #include <string.h>
 #include "threads/init.h"
 #include "threads/pte.h"
+#include "threads/thread.h"
 #include "threads/palloc.h"
 #include "threads/malloc.h"
 #include "vm/frame.h"
@@ -33,7 +34,8 @@ void
 pagedir_destroy (uint32_t *pd)
 {
   uint32_t *pde;
-
+  char * name = thread_current()->name;
+  tid_t tid = thread_current()->tid;
   if (pd == NULL)
     return;
 
@@ -47,18 +49,18 @@ pagedir_destroy (uint32_t *pd)
         for (pte = pt; pte < pt + PGSIZE / sizeof *pte; pte++)
           if (*pte & PTE_P) {
             uint32_t *ppt = pte_get_page (*pte);
-           if(DEBUG)printf("freeing address %p, content 0x%x\n", ppt, *ppt);
+           if(DEBUG)printf("(%s - %d) freeing address %p, content 0x%x\n", name, tid, ppt, *ppt);
             frame_free(ppt);
           } else if (*pte != 0) {
             struct suppl_page * page = (struct suppl_page *) *pte;
-            if(DEBUG)printf ("supplementary page table address %p, content 0x%x\n", pte, *pte);
+            if(DEBUG)printf ("(%s - %d) supplementary page table address %p, content 0x%x\n", name, tid, pte, *pte);
             if(page->location == SWAP)
               swap_free (page->swap_elem);
             if (page->origin != 0)
              free (page->origin);
             free (page);
           } else {
-            if(DEBUG) printf("Empty address 0x%x\n", *pte);
+            //if(DEBUG) printf("Empty address 0x%x\n", *pte);
           }
         palloc_free_page (pt);
       }

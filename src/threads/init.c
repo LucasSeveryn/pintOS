@@ -30,7 +30,6 @@
 #include "userprog/tss.h"
 #include "vm/frame.h"
 #include "vm/swap.h"
-#include "vm/read_buffer.h"
 #else
 #include "tests/threads/tests.h"
 #endif
@@ -133,7 +132,6 @@ main (void)
 #ifdef USERPROG
   swap_init();
   frame_init();
-  read_buffer_init();
 #endif
 
   printf ("Boot complete.\n");

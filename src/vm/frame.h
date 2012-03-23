@@ -5,7 +5,7 @@
 #include "vm/page.h"
 #include "vm/swap.h"
 
-struct frame{
+struct frame {
 	void *addr;
 	void *upage;
 	struct thread *thread;
@@ -23,6 +23,9 @@ void frame_pin(void *, int);
 void frame_unpin_kernel(void *, int);
 void frame_pin_kernel(void *, int);
 void frame_unpin(void *, int);
+void lock_frames (void);
+void unlock_frames (void);
+
 struct frame *frame_find(void *);
 
 
