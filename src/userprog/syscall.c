@@ -474,23 +474,18 @@ syscall_munmap (int *args, struct intr_frame *f UNUSED)
     sema_down(t->pagedir_mod);
     bool dirty = pagedir_is_dirty (t->pagedir, uaddr);
     void * kpage = pagedir_get_page(t->pagedir, uaddr);
-    //printf("uaddr %p, dirty %d, kpage 0x%x\n", uaddr, dirty, kpage);
     sema_up(t->pagedir_mod);
     if(pg_ofs(kpage) == 0 && dirty) {
       int zero_after = ( i == pages - 1) ? fl%PGSIZE : PGSIZE;
       file_seek (fh->file, i*PGSIZE);
 
-      lock_frames();
       frame_pin (uaddr, PGSIZE);
-      unlock_frames();
 
       filesys_lock_acquire();
       file_write (fh->file, uaddr, zero_after);
       filesys_lock_release();
 
-      lock_frames();
       frame_unpin (uaddr, PGSIZE);
-      unlock_frames();
     }
     sema_down(t->pagedir_mod);
     pagedir_clear_page (t->pagedir, uaddr);

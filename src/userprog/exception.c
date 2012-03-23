@@ -212,15 +212,11 @@ page_fault (struct intr_frame *f)
         }
         filesys_lock_release();
 
-        lock_frames ();
         frame_pin (fault_page, PGSIZE);
-        unlock_frames ();
 
         memcpy (kpage, br, PGSIZE);
 
-        lock_frames ();
         frame_unpin (fault_page, PGSIZE);
-        unlock_frames ();
 
         free (br);
 
@@ -228,13 +224,9 @@ page_fault (struct intr_frame *f)
         writable = page->origin->writable;
         break;
       case SWAP:
-        lock_frames ();
         frame_pin (fault_page, PGSIZE);
-        unlock_frames ();
         swap_load( kpage, page->swap_elem );
-        lock_frames ();
         frame_unpin (fault_page, PGSIZE);
-        unlock_frames ();
         dirty = true;
         break;
       case ZERO:

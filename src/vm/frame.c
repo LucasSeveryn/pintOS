@@ -89,9 +89,14 @@ void frame_set_pin (void *, bool);
 
 void
 frame_set_pin (void * kpage, bool pinval){
+	lock_frames ();
     struct frame * frame = frame_find (kpage);
-    if( frame == NULL ) return;
+    if( frame == NULL )  {
+    	unlock_frames ();
+    	return;
+    }
     frame->pinned = pinval;
+   	unlock_frames ();
 }
 
 void
@@ -101,7 +106,9 @@ frame_pin (void * vaddr, int l){
 	int it = l / PGSIZE;
 	if( l % PGSIZE ) it++;
 	for( i = 0; i < it; i++ ){
+		sema_down(t->pagedir_mod);
 		void * kpage = pagedir_get_page (t->pagedir, pg_round_down(vaddr) + i * PGSIZE);
+		sema_up(t->pagedir_mod);
 		if( kpage == 0 || pg_ofs(kpage) != 0 ) return;
 		frame_set_pin (kpage, true);
 	}
@@ -114,7 +121,9 @@ frame_unpin (void * vaddr, int l){
 	int it = l / PGSIZE;
 	if( l % PGSIZE ) it++;
 	for( i = 0; i < it; i++ ){
+		sema_down(t->pagedir_mod);
 		void * kpage = pagedir_get_page (t->pagedir, pg_round_down(vaddr) + i * PGSIZE);
+		sema_up(t->pagedir_mod);
 		if( kpage == 0 || pg_ofs(kpage) != 0 ) return;
 	    frame_set_pin (kpage, false);
 	}
