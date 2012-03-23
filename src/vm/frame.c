@@ -103,9 +103,9 @@ frame_pin (void * vaddr, int l){
 	int it = l / PGSIZE;
 	if( l % PGSIZE ) it++;
 	for( i = 0; i < it; i++ ){
-		sema_down(t->pagedir_mod);
+		sema_down(&t->pagedir_mod);
 		void * kpage = pagedir_get_page (t->pagedir, pg_round_down(vaddr) + i * PGSIZE);
-		sema_up(t->pagedir_mod);
+		sema_up(&t->pagedir_mod);
 		if( kpage == 0 || pg_ofs(kpage) != 0 ) return;
 		frame_set_pin (kpage, true);
 	}
@@ -118,9 +118,9 @@ frame_unpin (void * vaddr, int l){
 	int it = l / PGSIZE;
 	if( l % PGSIZE ) it++;
 	for( i = 0; i < it; i++ ){
-		sema_down(t->pagedir_mod);
+		sema_down(&t->pagedir_mod);
 		void * kpage = pagedir_get_page (t->pagedir, pg_round_down(vaddr) + i * PGSIZE);
-		sema_up(t->pagedir_mod);
+		sema_up(&t->pagedir_mod);
 		if( kpage == 0 || pg_ofs(kpage) != 0 ) return;
 	    frame_set_pin (kpage, false);
 	}
@@ -235,11 +235,11 @@ page_dump( struct frame * frame ){
 
 	if(DEBUG) printf("(%s - %d) Supplementary info are located at: %p\n", name, tid, (void *)suppl_page);
 
-	sema_down (frame->thread->pagedir_mod);
+	sema_down (&frame->thread->pagedir_mod);
 	pagedir_clear_page ( frame->thread->pagedir, frame->upage );
 	pagedir_set_page_suppl ( frame->thread->pagedir, frame->upage, suppl_page );
 	//pagedir_set_accessed ( frame->thread->pagedir, frame->upage, false );
-	sema_up (frame->thread->pagedir_mod);
+	sema_up (&frame->thread->pagedir_mod);
 
 }
 
@@ -261,9 +261,9 @@ evict(){
 		while(kpage == NULL && hash_next (&it)){
 			f = hash_entry (hash_cur (&it), struct frame, hash_elem);
 			if( f->pinned ) continue;
-			sema_down (f->thread->pagedir_mod);
+			sema_down (&f->thread->pagedir_mod);
 			int class = get_class (f->thread->pagedir, f->upage);
-			sema_up (f->thread->pagedir_mod);
+			sema_up (&f->thread->pagedir_mod);
 			if( class == 1 ){
 				page_dump (f);
 				kpage = f->addr;
@@ -276,9 +276,9 @@ evict(){
 		while(kpage == NULL && hash_next (&it)){
 			f = hash_entry (hash_cur (&it), struct frame, hash_elem);
 			if( f->pinned ) continue;
-			sema_down (f->thread->pagedir_mod);
+			sema_down (&f->thread->pagedir_mod);
 			int class = get_class (f->thread->pagedir, f->upage);
-			sema_up (f->thread->pagedir_mod);
+			sema_up (&f->thread->pagedir_mod);
 			if( class == 3 ){
 				page_dump (f);
 				kpage = f->addr;

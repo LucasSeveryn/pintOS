@@ -438,18 +438,18 @@ syscall_mmap (int *args, struct intr_frame *f UNUSED)
     off_t offset = i * PGSIZE;
     struct suppl_page *new_page = new_file_page(mmap_fh->file, offset, zero_after, true, FILE);
 
-    sema_down(t->pagedir_mod);
+    sema_down(&t->pagedir_mod);
     void * overlapControl = pagedir_get_page(t->pagedir, upage + offset);
-    sema_up(t->pagedir_mod);
+    sema_up(&t->pagedir_mod);
 
     if( overlapControl != 0 ){
       free (new_page);
       f->eax = -1;
       return;
     }
-    sema_down(t->pagedir_mod);
+    sema_down(&t->pagedir_mod);
     pagedir_set_page_suppl (t->pagedir, upage + offset, new_page);
-    sema_up(t->pagedir_mod);
+    sema_up(&t->pagedir_mod);
   }
 
   f->eax = mmap_fd;
@@ -471,10 +471,10 @@ syscall_munmap (int *args, struct intr_frame *f UNUSED)
   int i;
   for( i = 0; i < pages; i++ ){
     void * uaddr = upage + i*PGSIZE;
-    sema_down(t->pagedir_mod);
+    sema_down(&t->pagedir_mod);
     bool dirty = pagedir_is_dirty (t->pagedir, uaddr);
     void * kpage = pagedir_get_page(t->pagedir, uaddr);
-    sema_up(t->pagedir_mod);
+    sema_up(&t->pagedir_mod);
     if(pg_ofs(kpage) == 0 && dirty) {
       int zero_after = ( i == pages - 1) ? fl%PGSIZE : PGSIZE;
       file_seek (fh->file, i*PGSIZE);
@@ -487,9 +487,9 @@ syscall_munmap (int *args, struct intr_frame *f UNUSED)
 
       frame_unpin (uaddr, PGSIZE);
     }
-    sema_down(t->pagedir_mod);
+    sema_down(&t->pagedir_mod);
     pagedir_clear_page (t->pagedir, uaddr);
-    sema_up(t->pagedir_mod);
+    sema_up(&t->pagedir_mod);
   }
 
   list_remove (&fh->elem);

@@ -167,9 +167,9 @@ page_fault (struct intr_frame *f)
   if (!is_user_vaddr(fault_addr))
     syscall_t_exit (t->name, -1);
 
-  sema_down (t->pagedir_mod);
+  sema_down (&t->pagedir_mod);
   void *ret_page = pagedir_get_page(t->pagedir, fault_page);
-  sema_up (t->pagedir_mod);
+  sema_up (&t->pagedir_mod);
 
   if(DEBUG)printf("Current mapping for faulted address is %p\n", ret_page);
   void *esp = f->cs == SEL_KCSEG ? t->esp : f->esp;
@@ -241,12 +241,12 @@ page_fault (struct intr_frame *f)
   if (kpage == NULL) {
     kpage = frame_get (fault_page, true, NULL);
   }
-  sema_down (t->pagedir_mod);
+  sema_down (&t->pagedir_mod);
   pagedir_clear_page (t->pagedir, fault_page);
   /* Add the page to the process's address space. */
   if (!pagedir_set_page (t->pagedir, fault_page, kpage, writable))
   {
-    sema_up (t->pagedir_mod);
+    sema_up (&t->pagedir_mod);
     lock_frames ();
     frame_free (kpage);
     unlock_frames ();
@@ -255,5 +255,5 @@ page_fault (struct intr_frame *f)
   if(DEBUG)printf("(%s - %d) At the end virtual address %p points to %p\n", name, tid, fault_page, kpage);
   pagedir_set_dirty (t->pagedir, fault_page, dirty);
   pagedir_set_accessed (t->pagedir, fault_page, true);
-  sema_up (t->pagedir_mod);
+  sema_up (&t->pagedir_mod);
 }

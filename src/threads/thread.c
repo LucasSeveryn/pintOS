@@ -327,10 +327,10 @@ thread_exit (void)
     int i;
     for( i = 0; i < pages; i++ ){
       void * uaddr = upage + i*PGSIZE;
-      sema_down(t->pagedir_mod);
+      sema_down(&t->pagedir_mod);
       bool dirty = pagedir_is_dirty (t->pagedir, uaddr);
       void * kpage = pagedir_get_page(t->pagedir, uaddr);
-      sema_up(t->pagedir_mod);
+      sema_up(&t->pagedir_mod);
       if(pg_ofs(kpage) == 0 && dirty) {
         int zero_after = ( i == pages - 1) ? fl%PGSIZE : PGSIZE;
         file_seek (fh->file, i*PGSIZE);
@@ -347,9 +347,9 @@ thread_exit (void)
         frame_unpin (uaddr, PGSIZE);
         unlock_frames();
       }
-      sema_down(t->pagedir_mod);
+      sema_down(&t->pagedir_mod);
       pagedir_clear_page (t->pagedir, uaddr);
-      sema_up(t->pagedir_mod);
+      sema_up(&t->pagedir_mod);
     }
 
     file_close (fh->file);
@@ -558,6 +558,7 @@ init_thread (struct thread *t, const char *name, int priority)
   t->priority = priority;
 
   #ifdef USERPROG
+  sema_init (&t->pagedir_mod, 1);
   t->child_alive = NULL;
   list_init (&t->children);
   list_init (&t->files);
