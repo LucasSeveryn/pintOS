@@ -13,6 +13,7 @@
 #include "threads/vaddr.h"
 #include "devices/timer.h"
 #include "threads/malloc.h"
+#include "threads/pte.h"
 #ifdef USERPROG
 #include "userprog/process.h"
 #include "userprog/pagedir.h"
@@ -326,17 +327,31 @@ thread_exit (void)
     int i;
     for( i = 0; i < pages; i++ ){
       void * uaddr = upage + i*PGSIZE;
+      sema_down(t->pagedir_mod);
       bool dirty = pagedir_is_dirty (t->pagedir, uaddr);
-      if(dirty){
+      uint32_t kpage = (uint32_t) pagedir_get_page(t->pagedir, uaddr);
+      sema_up(t->pagedir_mod);
+      if((kpage & PTE_P) != 0 && dirty){
         int zero_after = ( i == pages - 1) ? fl%PGSIZE : PGSIZE;
         file_seek (fh->file, i*PGSIZE);
-        filesys_lock_acquire ();
+
+        lock_frames();
         frame_pin (uaddr, PGSIZE);
+        unlock_frames();
+
+        filesys_lock_acquire();
         file_write (fh->file, uaddr, zero_after);
+        filesys_lock_release();
+
+        lock_frames();
         frame_unpin (uaddr, PGSIZE);
-        filesys_lock_release ();
+        unlock_frames();
       }
+      sema_down(t->pagedir_mod);
+      pagedir_clear_page (t->pagedir, uaddr);
+      sema_up(t->pagedir_mod);
     }
+
     file_close (fh->file);
     free (fh);
   }

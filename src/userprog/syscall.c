@@ -8,6 +8,7 @@
 #include "threads/vaddr.h"
 #include "threads/synch.h"
 #include "threads/malloc.h"
+#include "threads/pte.h"
 #include "filesys/filesys.h"
 #include "devices/shutdown.h"
 #include "devices/input.h"
@@ -301,7 +302,7 @@ syscall_read (int *args, struct intr_frame *f )
     memcpy (buffer, br, args[3]);
     frame_unpin (buffer, args[3]);
     free(br);
-    
+
     f->eax = written;
   }
 }
@@ -334,7 +335,7 @@ syscall_write (int *args, struct intr_frame *f)
       putbuf ((char*)(buffer + written), size);
       written+= size;
     }
-    
+
     frame_unpin (buffer, args[3]);
     filesys_lock_release ();
 
@@ -356,8 +357,8 @@ syscall_write (int *args, struct intr_frame *f)
     off_t written = file_write (fh->file, br, args[3]);
     filesys_lock_release ();
 
-    free (br);    
-    
+    free (br);
+
     f -> eax = written;
   }
 }
@@ -437,12 +438,18 @@ syscall_mmap (int *args, struct intr_frame *f UNUSED)
     off_t offset = i * PGSIZE;
     struct suppl_page *new_page = new_file_page(mmap_fh->file, offset, zero_after, true, FILE);
 
-    void * overlapControl = pagedir_get_page(t->pagedir, upage + i*PGSIZE);
-    if( overlapControl != NULL ){
+    sema_down(t->pagedir_mod);
+    void * overlapControl = pagedir_get_page(t->pagedir, upage + offset);
+    sema_up(t->pagedir_mod);
+
+    if( overlapControl != 0 ){
+      free (new_page);
       f->eax = -1;
       return;
     }
+    sema_down(t->pagedir_mod);
     pagedir_set_page_suppl (t->pagedir, upage + offset, new_page);
+    sema_up(t->pagedir_mod);
   }
 
   f->eax = mmap_fd;
@@ -464,15 +471,29 @@ syscall_munmap (int *args, struct intr_frame *f UNUSED)
   int i;
   for( i = 0; i < pages; i++ ){
     void * uaddr = upage + i*PGSIZE;
+    sema_down(t->pagedir_mod);
     bool dirty = pagedir_is_dirty (t->pagedir, uaddr);
-    if(dirty){
+    uint32_t kpage = (uint32_t) pagedir_get_page(t->pagedir, uaddr);
+    sema_up(t->pagedir_mod);
+    if((kpage & PTE_P) != 0 && dirty) {
       int zero_after = ( i == pages - 1) ? fl%PGSIZE : PGSIZE;
       file_seek (fh->file, i*PGSIZE);
+
+      lock_frames();
       frame_pin (uaddr, PGSIZE);
+      unlock_frames();
+
+      filesys_lock_acquire();
       file_write (fh->file, uaddr, zero_after);
+      filesys_lock_release();
+
+      lock_frames();
       frame_unpin (uaddr, PGSIZE);
+      unlock_frames();
     }
+    sema_down(t->pagedir_mod);
     pagedir_clear_page (t->pagedir, uaddr);
+    sema_up(t->pagedir_mod);
   }
 
   list_remove (&fh->elem);

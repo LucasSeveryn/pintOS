@@ -14,7 +14,6 @@
 #include "vm/page.h"
 #include "vm/frame.h"
 
-
 static bool DEBUG = false;
 
 /* Number of page faults processed. */
@@ -199,7 +198,7 @@ page_fault (struct intr_frame *f)
         filesys_lock_acquire ();
         file_seek (page->origin->source_file, page->origin->offset);
         int a;
-        
+
         void * br = malloc (PGSIZE);
         if ((a = file_read (page->origin->source_file, br, page->origin->zero_after))
           != (int) page->origin->zero_after)
@@ -212,24 +211,38 @@ page_fault (struct intr_frame *f)
           syscall_t_exit (t->name, -1);
         }
         filesys_lock_release();
-        
+
+        lock_frames ();
         frame_pin (fault_page, PGSIZE);
+        unlock_frames ();
+
         memcpy (kpage, br, PGSIZE);
+
+        lock_frames ();
         frame_unpin (fault_page, PGSIZE);
+        unlock_frames ();
+
         free (br);
 
         memset (kpage + page->origin->zero_after, 0, PGSIZE - page->origin->zero_after);
         writable = page->origin->writable;
         break;
       case SWAP:
+        lock_frames ();
         frame_pin (fault_page, PGSIZE);
+        unlock_frames ();
         swap_load( kpage, page->swap_elem );
+        lock_frames ();
         frame_unpin (fault_page, PGSIZE);
+        unlock_frames ();
         dirty = true;
         break;
       case ZERO:
         memset (kpage, 0, PGSIZE);
         break;
+    }
+    if(pg_ofs(page) != 0) {
+      free(page);
     }
   }
 

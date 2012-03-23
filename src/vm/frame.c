@@ -102,12 +102,12 @@ frame_pin (void * vaddr, int l){
 	if( l % PGSIZE ) it++;
 	for( i = 0; i < it; i++ ){
 		void * kpage = pagedir_get_page (t->pagedir, pg_round_down(vaddr) + i * PGSIZE);
-		if( kpage == NULL ) return; 
+		if( kpage == NULL ) return;
 		frame_set_pin (kpage, true);
 	}
 }
 
-void 
+void
 frame_unpin (void * vaddr, int l){
 	struct thread * t = thread_current();
 	int i;
@@ -115,7 +115,7 @@ frame_unpin (void * vaddr, int l){
 	if( l % PGSIZE ) it++;
 	for( i = 0; i < it; i++ ){
 		void * kpage = pagedir_get_page (t->pagedir, pg_round_down(vaddr) + i * PGSIZE);
-		if( kpage == NULL ) return; 
+		if( kpage == NULL ) return;
 	    frame_set_pin (kpage, false);
 	}
 }
@@ -125,18 +125,18 @@ frame_pin_kernel (void * kpage, int l){
 	int it = l / PGSIZE;
 	if( l % PGSIZE ) it++;
 	for( i = 0; i < it; i++ ){
-		if( kpage == NULL ) return; 
+		if( kpage == NULL ) return;
 	    frame_set_pin (kpage, true);
 	}
 }
 
-void 
+void
 frame_unpin_kernel (void * kpage, int l){
 	int i;
 	int it = l / PGSIZE;
 	if( l % PGSIZE ) it++;
 	for( i = 0; i < it; i++ ){
-	    if( kpage == NULL ) return; 
+	    if( kpage == NULL ) return;
 	    frame_set_pin (kpage, false);
 	}
 }
@@ -207,7 +207,7 @@ page_dump( struct frame * frame ){
 		} else {
 			if(DEBUG)printf("(%s - %d) write to swap\n", name, tid);
 			struct swap_slt * swap_el = swap_slot( frame );
-			
+
 			frame_pin (frame->upage, PGSIZE);
 			swap_store (swap_el);
 			frame_unpin (frame->upage, PGSIZE);
@@ -254,7 +254,7 @@ evict(){
 		//Look for an element in the lowest class
 		while(kpage == NULL && hash_next (&it)){
 			f = hash_entry (hash_cur (&it), struct frame, hash_elem);
-			if( f->pinned ) continue;			
+			if( f->pinned ) continue;
 			sema_down (f->thread->pagedir_mod);
 			int class = get_class (f->thread->pagedir, f->upage);
 			sema_up (f->thread->pagedir_mod);
@@ -269,7 +269,7 @@ evict(){
 		//Look for an element in the higher class, at the same time lowering classes of passed elements
 		while(kpage == NULL && hash_next (&it)){
 			f = hash_entry (hash_cur (&it), struct frame, hash_elem);
-			if( f->pinned ) continue;	
+			if( f->pinned ) continue;
 			sema_down (f->thread->pagedir_mod);
 			int class = get_class (f->thread->pagedir, f->upage);
 			sema_up (f->thread->pagedir_mod);
@@ -286,5 +286,4 @@ evict(){
 	palloc_free_page (f->addr); //Free physical memory
 	hash_delete ( &frames, &f->hash_elem ); //Free entry in the frame table
 	free (f); //Delete the structure
-	//frame_free (kpage);
 }
