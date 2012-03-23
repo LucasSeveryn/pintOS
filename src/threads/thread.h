@@ -5,6 +5,7 @@
 #include <list.h>
 #include <hash.h>
 #include <stdint.h>
+#include "threads/synch.h"
 #include "filesys/file.h"
 
 /* States in a thread's life cycle. */
@@ -121,7 +122,7 @@ struct thread
     int ret;                            /* return status of the process */
     struct semaphore * child_alive;     /* smaphore indicating that child have not died yet */
     struct semaphore * child_loading;   /* semaphore indicating if the child is still loading*/
-    struct semaphore * pagedir_mod;   /* semaphore indicating if the child is still loading*/
+    struct semaphore pagedir_mod;       /* semaphore which secures operations on our pagedir */
 
     struct thread * parent;             /* parent of the thread */
     struct list_elem child;             /* element of parent's list of children*/
@@ -129,7 +130,7 @@ struct thread
     struct list children_return;        /* children statuses */
 
     struct list files;                  /*  files opened by the process*/
-    struct list mmap_files;                  /*  files mmaped by the process*/
+    struct list mmap_files;             /*  files mmaped by the process*/
     int next_fd;                        /*  descripton for next open file*/
     int next_mmap_fd;
 #endif

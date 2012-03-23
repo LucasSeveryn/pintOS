@@ -14,7 +14,6 @@
 #include "vm/page.h"
 #include "vm/frame.h"
 
-
 static bool DEBUG = false;
 
 /* Number of page faults processed. */
@@ -156,10 +155,7 @@ page_fault (struct intr_frame *f)
   page_fault_cnt++;
   void * fault_page = (void *) (PTE_ADDR & (uint32_t) fault_addr);
   struct thread *t = thread_current ();
-  char * name = t->name;
-  tid_t tid = t->tid;
-  if(DEBUG)printf("\n(%s - %d) Current Page Fault: %lld\n", name, tid, page_fault_cnt);
-  if(DEBUG)printf("(%s - %d) We have faulted to %p |#| ", name, tid, fault_page);
+
   /* Determine cause. */
   not_present = (f->error_code & PF_P) == 0;
   write = (f->error_code & PF_W) != 0;
@@ -168,11 +164,10 @@ page_fault (struct intr_frame *f)
   if (!is_user_vaddr(fault_addr))
     syscall_t_exit (t->name, -1);
 
-  sema_down (t->pagedir_mod);
+  sema_down (&t->pagedir_mod);
   void *ret_page = pagedir_get_page(t->pagedir, fault_page);
-  sema_up (t->pagedir_mod);
+  sema_up (&t->pagedir_mod);
 
-  if(DEBUG)printf("Current mapping for faulted address is %p\n", ret_page);
   void *esp = f->cs == SEL_KCSEG ? t->esp : f->esp;
 
   bool stack_access = is_stack_access (esp, fault_addr);
@@ -189,7 +184,6 @@ page_fault (struct intr_frame *f)
   if(ret_page != 0)
   {
     struct suppl_page *page = (struct suppl_page *) ret_page;
-    if(DEBUG)printf("(%s - %d) Supplemental page table is located in %d\n", name, tid, page->location);
     kpage = frame_get (fault_page, true, page->origin);
     /* Get a page of memory. */
     switch (page->location)
@@ -199,7 +193,7 @@ page_fault (struct intr_frame *f)
         filesys_lock_acquire ();
         file_seek (page->origin->source_file, page->origin->offset);
         int a;
-        
+
         void * br = malloc (PGSIZE);
         if ((a = file_read (page->origin->source_file, br, page->origin->zero_after))
           != (int) page->origin->zero_after)
@@ -212,43 +206,48 @@ page_fault (struct intr_frame *f)
           syscall_t_exit (t->name, -1);
         }
         filesys_lock_release();
-        
-        frame_pin (fault_page, PGSIZE);
+
+        frame_pin_kernel (kpage, PGSIZE);
+
         memcpy (kpage, br, PGSIZE);
-        frame_unpin (fault_page, PGSIZE);
+
+        frame_unpin_kernel (kpage, PGSIZE);
+
         free (br);
 
         memset (kpage + page->origin->zero_after, 0, PGSIZE - page->origin->zero_after);
         writable = page->origin->writable;
         break;
       case SWAP:
-        frame_pin (fault_page, PGSIZE);
-        swap_load( kpage, page->swap_elem );
-        frame_unpin (fault_page, PGSIZE);
+        frame_pin_kernel (kpage, PGSIZE);
+        swap_load (kpage, page->swap_elem);
+        frame_unpin_kernel (kpage, PGSIZE);
         dirty = true;
         break;
       case ZERO:
         memset (kpage, 0, PGSIZE);
         break;
     }
+    if(pg_ofs (page) != 0) {
+      free (page);
+    }
   }
 
   if (kpage == NULL) {
     kpage = frame_get (fault_page, true, NULL);
   }
-  sema_down (t->pagedir_mod);
+  sema_down (&t->pagedir_mod);
   pagedir_clear_page (t->pagedir, fault_page);
   /* Add the page to the process's address space. */
   if (!pagedir_set_page (t->pagedir, fault_page, kpage, writable))
   {
-    sema_up (t->pagedir_mod);
+    sema_up (&t->pagedir_mod);
     lock_frames ();
     frame_free (kpage);
     unlock_frames ();
     syscall_t_exit (t->name, -1);
   }
-  if(DEBUG)printf("(%s - %d) At the end virtual address %p points to %p\n", name, tid, fault_page, kpage);
   pagedir_set_dirty (t->pagedir, fault_page, dirty);
   pagedir_set_accessed (t->pagedir, fault_page, true);
-  sema_up (t->pagedir_mod);
+  sema_up (&t->pagedir_mod);
 }

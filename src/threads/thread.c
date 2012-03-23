@@ -13,6 +13,7 @@
 #include "threads/vaddr.h"
 #include "devices/timer.h"
 #include "threads/malloc.h"
+#include "threads/pte.h"
 #ifdef USERPROG
 #include "userprog/process.h"
 #include "userprog/pagedir.h"
@@ -319,24 +320,38 @@ thread_exit (void)
     void * upage = fh->upage;
     size_t fl = file_length (fh->file);
     int pages = fl / PGSIZE;
-    if( fl % PGSIZE > 0 ){
+    if(fl % PGSIZE > 0){
       pages++;
     }
 
     int i;
-    for( i = 0; i < pages; i++ ){
+    for(i = 0; i < pages; i++){
       void * uaddr = upage + i*PGSIZE;
+      sema_down (&t->pagedir_mod);
       bool dirty = pagedir_is_dirty (t->pagedir, uaddr);
-      if(dirty){
+      void * kpage = pagedir_get_page (t->pagedir, uaddr);
+      sema_up (&t->pagedir_mod);
+      if(pg_ofs (kpage) == 0 && dirty) {
         int zero_after = ( i == pages - 1) ? fl%PGSIZE : PGSIZE;
         file_seek (fh->file, i*PGSIZE);
-        filesys_lock_acquire ();
+
+        lock_frames ();
         frame_pin (uaddr, PGSIZE);
+        unlock_frames ();
+
+        filesys_lock_acquire ();
         file_write (fh->file, uaddr, zero_after);
-        frame_unpin (uaddr, PGSIZE);
         filesys_lock_release ();
+
+        lock_frames ();
+        frame_unpin (uaddr, PGSIZE);
+        unlock_frames ();
       }
+      sema_down (&t->pagedir_mod);
+      pagedir_clear_page (t->pagedir, uaddr);
+      sema_up (&t->pagedir_mod);
     }
+
     file_close (fh->file);
     free (fh);
   }
@@ -543,6 +558,7 @@ init_thread (struct thread *t, const char *name, int priority)
   t->priority = priority;
 
   #ifdef USERPROG
+  sema_init (&t->pagedir_mod, 1);
   t->child_alive = NULL;
   list_init (&t->children);
   list_init (&t->files);

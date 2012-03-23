@@ -8,6 +8,7 @@
 #include "threads/vaddr.h"
 #include "threads/synch.h"
 #include "threads/malloc.h"
+#include "threads/pte.h"
 #include "filesys/filesys.h"
 #include "devices/shutdown.h"
 #include "devices/input.h"
@@ -301,7 +302,7 @@ syscall_read (int *args, struct intr_frame *f )
     memcpy (buffer, br, args[3]);
     frame_unpin (buffer, args[3]);
     free(br);
-    
+
     f->eax = written;
   }
 }
@@ -334,7 +335,7 @@ syscall_write (int *args, struct intr_frame *f)
       putbuf ((char*)(buffer + written), size);
       written+= size;
     }
-    
+
     frame_unpin (buffer, args[3]);
     filesys_lock_release ();
 
@@ -356,8 +357,8 @@ syscall_write (int *args, struct intr_frame *f)
     off_t written = file_write (fh->file, br, args[3]);
     filesys_lock_release ();
 
-    free (br);    
-    
+    free (br);
+
     f -> eax = written;
   }
 }
@@ -401,54 +402,60 @@ syscall_close (int *args, struct intr_frame *f UNUSED)
   filesys_lock_release ();
 }
 
-/* void close( int ) - Closes a file with the given descriptor */
+/* void mmap( int, void * ) - Mmaps a file with the given descriptor to the address in memory */
 static void
 syscall_mmap (int *args, struct intr_frame *f UNUSED)
 {
   struct thread * t = thread_current ();
 
-  if( args[1] == 0 || args[1] == 1){
+  if(args[1] == 0 || args[1] == 1){
     f->eax = -1;
     return;
   }
   struct file_handle * fh = thread_get_file (&t->files, args[1]);
-  if( fh == NULL) syscall_t_exit (t -> name, -1);
+  if(fh == NULL) syscall_t_exit (t -> name, -1);
 
-  // Book the memory
-  int mmap_fd = thread_add_mmap_file (file_reopen (fh->file));
-  struct file_handle * mmap_fh = thread_get_file (&t->mmap_files, mmap_fd);
-
-  size_t fl = file_length (mmap_fh->file);
-  if( fl == 0 || args[2] == 0 || args[2] % PGSIZE > 0){
+  size_t fl = file_length (fh->file);
+  if(fl == 0 || args[2] == 0 || args[2] % PGSIZE > 0){
     f->eax = -1;
     return;
   }
 
+  /* Book the memory */
+  int mmap_fd = thread_add_mmap_file (file_reopen (fh->file));
+  struct file_handle * mmap_fh = thread_get_file (&t->mmap_files, mmap_fd);
+
   void * upage = (void*)args[2];
   mmap_fh->upage = upage;
   int pages = fl / PGSIZE;
-  if( fl % PGSIZE > 0 ){
+  if(fl % PGSIZE > 0){
     pages++;
   }
 
   int i;
-  for( i = 0; i < pages; i++ ){
-    size_t zero_after = ( i == pages - 1) ? fl % PGSIZE : PGSIZE;
+  for(i = 0; i < pages; i++){
+    size_t zero_after = (i == pages - 1) ? fl % PGSIZE : PGSIZE;
     off_t offset = i * PGSIZE;
-    struct suppl_page *new_page = new_file_page(mmap_fh->file, offset, zero_after, true, FILE);
+    struct suppl_page *new_page = new_file_page (mmap_fh->file, offset, zero_after, true, FILE);
 
-    void * overlapControl = pagedir_get_page(t->pagedir, upage + i*PGSIZE);
-    if( overlapControl != NULL ){
+    sema_down (&t->pagedir_mod);
+    void * overlapControl = pagedir_get_page (t->pagedir, upage + offset);
+    sema_up (&t->pagedir_mod);
+
+    if(overlapControl != 0){
+      free (new_page);
       f->eax = -1;
       return;
     }
+    sema_down (&t->pagedir_mod);
     pagedir_set_page_suppl (t->pagedir, upage + offset, new_page);
+    sema_up (&t->pagedir_mod);
   }
 
   f->eax = mmap_fd;
 }
 
-/* void close( int ) - Closes a file with the given descriptor */
+/* void munmap( mapid_t ) - Unmaps a file with the given descriptor */
 static void
 syscall_munmap (int *args, struct intr_frame *f UNUSED)
 {
@@ -457,22 +464,32 @@ syscall_munmap (int *args, struct intr_frame *f UNUSED)
   void * upage = fh->upage;
   size_t fl = file_length (fh->file);
   int pages = fl / PGSIZE;
-  if( fl % PGSIZE > 0 ){
+  if(fl % PGSIZE > 0){
     pages++;
   }
 
   int i;
-  for( i = 0; i < pages; i++ ){
+  for(i = 0; i < pages; i++){
     void * uaddr = upage + i*PGSIZE;
+    sema_down (&t->pagedir_mod);
     bool dirty = pagedir_is_dirty (t->pagedir, uaddr);
-    if(dirty){
-      int zero_after = ( i == pages - 1) ? fl%PGSIZE : PGSIZE;
+    void * kpage = pagedir_get_page(t->pagedir, uaddr);
+    sema_up (&t->pagedir_mod);
+    if(pg_ofs (kpage) == 0 && dirty) {
+      int zero_after = (i == pages - 1) ? fl%PGSIZE : PGSIZE;
       file_seek (fh->file, i*PGSIZE);
+
       frame_pin (uaddr, PGSIZE);
+
+      filesys_lock_acquire ();
       file_write (fh->file, uaddr, zero_after);
+      filesys_lock_release ();
+
       frame_unpin (uaddr, PGSIZE);
     }
+    sema_down (&t->pagedir_mod);
     pagedir_clear_page (t->pagedir, uaddr);
+    sema_up (&t->pagedir_mod);
   }
 
   list_remove (&fh->elem);

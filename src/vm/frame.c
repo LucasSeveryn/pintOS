@@ -16,7 +16,9 @@ void lock_frames (void);
 void unlock_frames (void);
 bool frame_less (const struct hash_elem *, const struct hash_elem *, void *);
 unsigned frame_hash (const struct hash_elem *, void *);
-void page_dump( struct frame * );
+void page_dump (struct frame *);
+void frame_set_pin (void *, bool);
+int get_class (uint32_t * , const void *);
 
 void
 lock_frames (){
@@ -33,21 +35,24 @@ frame_init (){
 	lock_init (&frames_lock);
 }
 
+/*
+Allocates a new page, and adds it to the frame table
+*/
 void *
 frame_get (void * upage, bool zero, struct origin_info *origin){
 	void * kpage = palloc_get_page ( PAL_USER | (zero ? PAL_ZERO : 0) );
-	struct thread * t = thread_current();
+	struct thread * t = thread_current ();
 
 	/* There is no more free memory, we need to free some */
-	if( kpage == NULL ) {
-		lock_frames();
-		evict();
+	if(kpage == NULL) {
+		lock_frames ();
+		evict ();
 		kpage = palloc_get_page ( PAL_USER | (zero ? PAL_ZERO : 0) );
-		unlock_frames();
+		unlock_frames ();
 	}
 
 	/* We succesfully allocated space for the page */
-	if( kpage != NULL ){
+	if(kpage != NULL){
 		struct frame * frame = (struct frame*) malloc (sizeof (struct frame));
 		frame -> addr = kpage;
 		frame -> upage = upage;
@@ -55,14 +60,17 @@ frame_get (void * upage, bool zero, struct origin_info *origin){
 		frame -> thread = t;
 		frame -> pinned = false;
 
-		lock_frames();
+		lock_frames ();
 		hash_insert (&frames, &frame -> hash_elem);
-		unlock_frames();
+		unlock_frames ();
 	}
 
 	return kpage;
 }
 
+/*
+Remove a frame, and clean up after it.
+*/
 bool
 frame_free (void * addr){
 	struct frame * frame;
@@ -71,11 +79,11 @@ frame_free (void * addr){
 	frame_elem.addr = addr;
 
 	found_frame = hash_find (&frames, &frame_elem.hash_elem);
-	if( found_frame != NULL ){
+	if(found_frame != NULL){
 		frame = hash_entry (found_frame, struct frame, hash_elem);
 
 		palloc_free_page (frame->addr); //Free physical memory
-		hash_delete ( &frames, &frame->hash_elem ); //Free entry in the frame table
+		hash_delete (&frames, &frame->hash_elem); //Free entry in the frame table
 		free (frame); //Delete the structure
 
 		return true;
@@ -88,12 +96,12 @@ frame_free (void * addr){
 /*
 Sets frame's pin to the given value
 */
-void frame_set_pin (void *, bool);
-
 void
 frame_set_pin (void * kpage, bool pinval){
     struct frame * frame = frame_find (kpage);
-    if( frame == NULL ) return;
+    if(frame == NULL)  {
+    	return;
+    }
     frame->pinned = pinval;
 }
 
@@ -102,13 +110,15 @@ Pins a frame using user virtual memory address
 */
 void
 frame_pin (void * vaddr, int l){
-	struct thread * t = thread_current();
+	struct thread * t = thread_current ();
 	int i;
 	int it = l / PGSIZE;
-	if( l % PGSIZE ) it++;
-	for( i = 0; i < it; i++ ){
+	if(l % PGSIZE) it++;
+	for(i = 0; i < it; i++){
+		sema_down (&t->pagedir_mod);
 		void * kpage = pagedir_get_page (t->pagedir, pg_round_down(vaddr) + i * PGSIZE);
-		if( kpage == NULL ) return; 
+		sema_up (&t->pagedir_mod);
+		if(kpage == 0 || pg_ofs (kpage) != 0) return;
 		frame_set_pin (kpage, true);
 	}
 }
@@ -118,13 +128,15 @@ Unpins a frame using user virtual memory address
 */
 void 
 frame_unpin (void * vaddr, int l){
-	struct thread * t = thread_current();
+	struct thread * t = thread_current ();
 	int i;
 	int it = l / PGSIZE;
-	if( l % PGSIZE ) it++;
-	for( i = 0; i < it; i++ ){
-		void * kpage = pagedir_get_page (t->pagedir, pg_round_down(vaddr) + i * PGSIZE);
-		if( kpage == NULL ) return; 
+	if(l % PGSIZE) it++;
+	for(i = 0; i < it; i++){
+		sema_down (&t->pagedir_mod);
+		void * kpage = pagedir_get_page (t->pagedir, pg_round_down (vaddr) + i * PGSIZE);
+		sema_up (&t->pagedir_mod);
+		if(kpage == 0 || pg_ofs (kpage) != 0)  return;
 	    frame_set_pin (kpage, false);
 	}
 }
@@ -136,9 +148,9 @@ void
 frame_pin_kernel (void * kpage, int l){
 	int i;
 	int it = l / PGSIZE;
-	if( l % PGSIZE ) it++;
-	for( i = 0; i < it; i++ ){
-		if( kpage == NULL ) return; 
+	if(l % PGSIZE) it++;
+	for(i = 0; i < it; i++){
+		if( kpage == 0 || pg_ofs (kpage) != 0 ) return;
 	    frame_set_pin (kpage, true);
 	}
 }
@@ -150,9 +162,9 @@ void
 frame_unpin_kernel (void * kpage, int l){
 	int i;
 	int it = l / PGSIZE;
-	if( l % PGSIZE ) it++;
-	for( i = 0; i < it; i++ ){
-	    if( kpage == NULL ) return; 
+	if(l % PGSIZE) it++;
+	for(i = 0; i < it; i++){
+	    if( kpage == 0 || pg_ofs (kpage) != 0 ) return;
 	    frame_set_pin (kpage, false);
 	}
 }
@@ -168,7 +180,7 @@ frame_find (void * addr){
 	frame_elem.addr = addr;
 
 	found_frame = hash_find (&frames, &frame_elem.hash_elem);
-	if( found_frame != NULL ){
+	if(found_frame != NULL){
 		frame = hash_entry (found_frame, struct frame, hash_elem);
 		return frame;
 	} else {
@@ -192,22 +204,20 @@ Hash function
 unsigned
 frame_hash(const struct hash_elem *fe, void *aux UNUSED){
 	const struct frame * frame = hash_entry (fe, struct frame, hash_elem);
-	return hash_int ((unsigned)frame->addr); //Dirty conversion
+	return hash_int ((unsigned)frame->addr);
 }
 
 
 /*
 Determines a class the page belongs to
 */
-int get_class( uint32_t * , const void * );
-
 int
-get_class( uint32_t * pd, const void * page ){
+get_class (uint32_t * pd, const void * page) {
 	void * kpage = pagedir_get_page (pd, page);
-	if( kpage == NULL ) return -1;
+	if(kpage == NULL) return -1;
 
-	bool dirty = pagedir_is_dirty ( pd, page );
-	bool accessed = pagedir_is_accessed ( pd, page );
+	bool dirty = pagedir_is_dirty (pd, page);
+	bool accessed = pagedir_is_accessed (pd, page);
 
 	return (accessed) ? (( dirty ) ? 4 : 2) : (( dirty ) ? 3 : 1);
 }
@@ -218,19 +228,13 @@ Performs actual eviction of a page.
 */
 void
 page_dump( struct frame * frame ){
-	bool dirty = pagedir_is_dirty ( frame->thread->pagedir, frame->upage );
+	bool dirty = pagedir_is_dirty (frame->thread->pagedir, frame->upage);
 	struct suppl_page * suppl_page = NULL;
-
-	char * name = thread_current()->name;
-	tid_t tid = thread_current()->tid;
-
-	if(DEBUG)printf("(%s - %d) Evict %p with mapping %p from %s - %d\n", name, tid, frame->upage, pagedir_get_page(frame->thread->pagedir, frame->upage), frame->thread->name, frame->thread->tid);
 
 	if (dirty)
 	{
 		if (frame->origin != NULL && frame->origin->location == FILE)
 		{
-			if(DEBUG)printf("(%s - %d) write to disk\n", name, tid);
 			filesys_lock_acquire ();
 			frame_pin (frame->upage, PGSIZE);
 			file_write_at (frame->origin->source_file, frame->addr, frame->origin->zero_after, frame->origin->offset);
@@ -239,60 +243,54 @@ page_dump( struct frame * frame ){
 
 			suppl_page = new_file_page (frame->origin->source_file, frame->origin->offset, frame->origin->zero_after, frame->origin->writable, FILE);
 		} else {
-			if(DEBUG)printf("(%s - %d) write to swap\n", name, tid);
-			struct swap_slt * swap_el = swap_slot( frame );
-			
+			struct swap_slt * swap_el = swap_slot(frame);
+
 			frame_pin (frame->upage, PGSIZE);
 			swap_store (swap_el);
 			frame_unpin (frame->upage, PGSIZE);
 
-			suppl_page = new_swap_page ( swap_el );
+			suppl_page = new_swap_page (swap_el);
 		}
 	}
 	else
 	{
 		if (frame->origin != NULL)
 		{
-			if(DEBUG)printf("(%s - %d) discard file\n", name, tid);
 			suppl_page = new_file_page (frame->origin->source_file, frame->origin->offset, frame->origin->zero_after, frame->origin->writable, frame->origin->location);
 		} else {
-			if(DEBUG)printf("(%s - %d) discard zero\n", name, tid);
 			suppl_page = new_zero_page ();
 		}
 	}
 
-	if(DEBUG) printf("(%s - %d) Supplementary info are located at: %p\n", name, tid, (void *)suppl_page);
-
-	sema_down (frame->thread->pagedir_mod);
-	pagedir_clear_page ( frame->thread->pagedir, frame->upage );
-	pagedir_set_page_suppl ( frame->thread->pagedir, frame->upage, suppl_page );
-	//pagedir_set_accessed ( frame->thread->pagedir, frame->upage, false );
-	sema_up (frame->thread->pagedir_mod);
+	sema_down (&frame->thread->pagedir_mod);
+	pagedir_clear_page (frame->thread->pagedir, frame->upage);
+	pagedir_set_page_suppl (frame->thread->pagedir, frame->upage, suppl_page);
+	sema_up (&frame->thread->pagedir_mod);
 
 }
 
+/*
+Selects a frame to evict
+*/
 void
 evict(){
 	struct hash_iterator it;
 	void * kpage = NULL;
 	struct frame *f = NULL;
 	int i;
-	char * name = thread_current()->name;
-	tid_t tid = thread_current()->tid;
-	if(DEBUG) printf("(%s - %d) We need to evict a page!\n", name, tid);
-
-	//Second chance page replacement
-	for( i = 0; i < 2 && kpage == NULL; i++ ){
+	
+	/* Second chance page replacement */
+	for(i = 0; i < 2 && kpage == NULL; i++){
 		hash_first (&it, &frames);
 
-		//Look for an element in the lowest class
+		/* Look for an element in the lowest class */
 		while(kpage == NULL && hash_next (&it)){
 			f = hash_entry (hash_cur (&it), struct frame, hash_elem);
-			if( f->pinned ) continue;			
-			sema_down (f->thread->pagedir_mod);
+			if(f->pinned) continue;
+			sema_down (&f->thread->pagedir_mod);
 			int class = get_class (f->thread->pagedir, f->upage);
-			sema_up (f->thread->pagedir_mod);
-			if( class == 1 ){
+			sema_up (&f->thread->pagedir_mod);
+			if(class == 1){
 				page_dump (f);
 				kpage = f->addr;
 			}
@@ -300,25 +298,23 @@ evict(){
 
 		hash_first (&it, &frames);
 
-		//Look for an element in the higher class, at the same time lowering classes of passed elements
+		/* Look for an element in the higher class, at the same time lowering classes of passed elements */
 		while(kpage == NULL && hash_next (&it)){
 			f = hash_entry (hash_cur (&it), struct frame, hash_elem);
-			if( f->pinned ) continue;	
-			sema_down (f->thread->pagedir_mod);
+			if(f->pinned) continue;
+			sema_down (&f->thread->pagedir_mod);
 			int class = get_class (f->thread->pagedir, f->upage);
-			sema_up (f->thread->pagedir_mod);
-			if( class == 3 ){
+			sema_up (&f->thread->pagedir_mod);
+			if(class == 3){
 				page_dump (f);
 				kpage = f->addr;
-			} else if( class > 0 ){
+			} else if(class > 0){
 				pagedir_set_accessed (f->thread->pagedir, f->upage, false);
 			}
 		}
 	}
 
-	if(DEBUG)printf("(%s - %d) After eviction current mapping for %p is %p\n", name, tid, f->upage, pagedir_get_page(f->thread->pagedir, f->upage));
-	palloc_free_page (f->addr); //Free physical memory
-	hash_delete ( &frames, &f->hash_elem ); //Free entry in the frame table
-	free (f); //Delete the structure
-	//frame_free (kpage);
+	palloc_free_page (f->addr); /* Free physical memory */
+	hash_delete (&frames, &f->hash_elem); /* Free entry in the frame table */
+	free (f); /* Delete the structure */
 }

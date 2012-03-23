@@ -2,7 +2,7 @@
 #include "threads/malloc.h"
 
 struct suppl_page *
-new_zero_page()
+new_zero_page ()
 {
 	struct suppl_page *new_page = (struct suppl_page *) malloc (sizeof (struct suppl_page));
 	if(new_page == NULL) {
@@ -15,7 +15,7 @@ new_zero_page()
 }
 
 struct suppl_page *
-new_file_page(struct file * source, off_t offset, size_t zero_after, bool writable, enum page_type location)
+new_file_page (struct file * source, off_t offset, size_t zero_after, bool writable, enum page_type location)
 {
 	struct suppl_page *new_page = (struct suppl_page *) malloc (sizeof (struct suppl_page));
 	if(new_page == NULL) {
@@ -39,7 +39,7 @@ new_file_page(struct file * source, off_t offset, size_t zero_after, bool writab
 }
 
 struct suppl_page *
-new_swap_page(struct swap_slt *swap_location)
+new_swap_page (struct swap_slt *swap_location)
 {
 	struct suppl_page *new_page = (struct suppl_page *) malloc (sizeof (struct suppl_page));
 	if(new_page == NULL) {
