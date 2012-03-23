@@ -300,9 +300,7 @@ process_activate (void)
   struct thread *t = thread_current ();
 
   /* Activate thread's page tables. */
-  sema_down(&t->pagedir_mod);
   pagedir_activate (t->pagedir);
-  sema_up(&t->pagedir_mod);
 
   /* Set thread's kernel stack for use in processing
      interrupts. */
