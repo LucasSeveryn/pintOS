@@ -89,14 +89,11 @@ void frame_set_pin (void *, bool);
 
 void
 frame_set_pin (void * kpage, bool pinval){
-	lock_frames ();
     struct frame * frame = frame_find (kpage);
     if( frame == NULL )  {
-    	unlock_frames ();
     	return;
     }
     frame->pinned = pinval;
-   	unlock_frames ();
 }
 
 void
