@@ -327,11 +327,12 @@ thread_exit (void)
     int i;
     for( i = 0; i < pages; i++ ){
       void * uaddr = upage + i*PGSIZE;
+      printf("uaddr: %p\n", uaddr);
       sema_down(t->pagedir_mod);
       bool dirty = pagedir_is_dirty (t->pagedir, uaddr);
       uint32_t kpage = (uint32_t) pagedir_get_page(t->pagedir, uaddr);
       sema_up(t->pagedir_mod);
-      if((kpage & PTE_P) != 0 && dirty){
+      if((kpage & PTE_P) != 0 && dirty) {
         int zero_after = ( i == pages - 1) ? fl%PGSIZE : PGSIZE;
         file_seek (fh->file, i*PGSIZE);
 

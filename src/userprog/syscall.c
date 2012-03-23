@@ -415,15 +415,15 @@ syscall_mmap (int *args, struct intr_frame *f UNUSED)
   struct file_handle * fh = thread_get_file (&t->files, args[1]);
   if( fh == NULL) syscall_t_exit (t -> name, -1);
 
-  // Book the memory
-  int mmap_fd = thread_add_mmap_file (file_reopen (fh->file));
-  struct file_handle * mmap_fh = thread_get_file (&t->mmap_files, mmap_fd);
-
-  size_t fl = file_length (mmap_fh->file);
+  size_t fl = file_length (fh->file);
   if( fl == 0 || args[2] == 0 || args[2] % PGSIZE > 0){
     f->eax = -1;
     return;
   }
+
+  // Book the memory
+  int mmap_fd = thread_add_mmap_file (file_reopen (fh->file));
+  struct file_handle * mmap_fh = thread_get_file (&t->mmap_files, mmap_fd);
 
   void * upage = (void*)args[2];
   mmap_fh->upage = upage;
