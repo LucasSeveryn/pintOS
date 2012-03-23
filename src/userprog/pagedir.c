@@ -33,7 +33,6 @@ void
 pagedir_destroy (uint32_t *pd)
 {
   uint32_t *pde;
-  bool freed = false;
 
   if (pd == NULL)
     return;
@@ -50,8 +49,6 @@ pagedir_destroy (uint32_t *pd)
             uint32_t *ppt = pte_get_page (*pte);
            if(DEBUG)printf("freeing address %p, content 0x%x\n", ppt, *ppt);
             frame_free(ppt);
-            //freed = frame_free (ppt);
-            //if(!freed)palloc_free_page (ppt);
           } else if (*pte != 0) {
             struct suppl_page * page = (struct suppl_page *) *pte;
             if(DEBUG)printf ("supplementary page table address %p, content 0x%x\n", pte, *pte);
@@ -64,7 +61,6 @@ pagedir_destroy (uint32_t *pd)
             if(DEBUG) printf("Empty address 0x%x\n", *pte);
           }
         palloc_free_page (pt);
-        //if(!freed)palloc_free_page (pt);
       }
   palloc_free_page (pd);
 }

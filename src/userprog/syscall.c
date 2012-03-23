@@ -2,6 +2,7 @@
 #include "userprog/process.h"
 #include <stdio.h>
 #include <syscall-nr.h>
+#include <string.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
@@ -12,6 +13,7 @@
 #include "devices/input.h"
 #include "vm/page.h"
 #include "vm/frame.h"
+#include "vm/read_buffer.h"
 
 #include "userprog/pagedir.h"
 #include <kernel/stdio.h>
@@ -39,6 +41,8 @@ static void (*syscall_functions[NOA]) (int* , struct intr_frame *); /* Array of 
 static struct lock filesys_lock;  /* File system lock */
 
 static int syscall_noa[NOA];  /* Array with number of arguments for every syscall */
+
+static bool DEBUG = false;
 
 /* Reads a word at user virtual address UADDR.
 UADDR must be below PHYS_BASE.
@@ -271,9 +275,11 @@ syscall_read (int *args, struct intr_frame *f )
     validate_user (buffer);
 
     filesys_lock_acquire ();
+    frame_pin (buffer, args[3]);
     for( ; i < args[3]; i++){
       buffer[i] = input_getc();
     }
+    frame_unpin (buffer, args[3]);
     filesys_lock_release ();
 
     f -> eax = args[3];
@@ -286,10 +292,17 @@ syscall_read (int *args, struct intr_frame *f )
     struct file_handle * fh = thread_get_file (&t->files, args[1]);
     if( fh == NULL ) syscall_t_exit (t->name, -1);
 
+    void * br = malloc (args[3]);
+
     filesys_lock_acquire ();
-    off_t written = file_read (fh->file, buffer, args[3]);
+    off_t written = file_read (fh->file, br, args[3]);
     filesys_lock_release ();
 
+    frame_pin_kernel (buffer, args[3]);
+    memcpy (buffer, br, args[3]);
+    frame_unpin_kernel (buffer, args[3]);
+    free(br);
+    
     f->eax = written;
   }
 }
@@ -310,6 +323,7 @@ syscall_write (int *args, struct intr_frame *f)
 
     int written = 0;
     filesys_lock_acquire ();
+    frame_pin (buffer, args[3]);
 
     if(size < 512) putbuf ((char*)buffer, size);
     else {
@@ -321,7 +335,8 @@ syscall_write (int *args, struct intr_frame *f)
       putbuf ((char*)(buffer + written), size);
       written+= size;
     }
-
+    
+    frame_unpin (buffer, args[3]);
     filesys_lock_release ();
 
     f -> eax = written;
@@ -332,10 +347,18 @@ syscall_write (int *args, struct intr_frame *f)
     struct file_handle * fh = thread_get_file (&t->files, args[1]);
     if( fh == NULL ) syscall_t_exit (t->name, -1);
 
+    void * br = malloc (args[3]);
+
+    frame_pin (buffer, args[3]);
+    memcpy (br, buffer, args[3]);
+    frame_unpin (buffer, args[3]);
+
     filesys_lock_acquire ();
-    off_t written = file_write (fh->file, buffer, args[3]);
+    off_t written = file_write (fh->file, br, args[3]);
     filesys_lock_release ();
 
+    free (br);    
+    
     f -> eax = written;
   }
 }
@@ -446,7 +469,9 @@ syscall_munmap (int *args, struct intr_frame *f UNUSED)
     if(dirty){
       int zero_after = ( i == pages - 1) ? fl%PGSIZE : PGSIZE;
       file_seek (fh->file, i*PGSIZE);
+      frame_pin (uaddr, PGSIZE);
       file_write (fh->file, uaddr, zero_after);
+      frame_unpin (uaddr, PGSIZE);
     }
     pagedir_clear_page (t->pagedir, uaddr);
   }

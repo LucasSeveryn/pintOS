@@ -48,11 +48,11 @@ swap_store (struct swap_slt * swap_slt)
 
 	block_sector_t swap_addr = swap_find_free();
 
-	filesys_lock_acquire ();
+	//filesys_lock_acquire ();
 	for( i = 0; i < PGSIZE / BLOCK_SECTOR_SIZE; i++ )
 		block_write ( swap, swap_addr + i, swap_slt -> frame -> addr + i * BLOCK_SECTOR_SIZE );
-	filesys_lock_release ();
-	
+	//filesys_lock_release ();
+
 	swap_slt -> swap_addr = swap_addr;
 }
 
@@ -60,10 +60,10 @@ void
 swap_load (void *addr, struct swap_slt * swap_slt)
 {
 	int i;
-	filesys_lock_acquire ();
+	//filesys_lock_acquire ();
 	for( i = 0; i < PGSIZE / BLOCK_SECTOR_SIZE; i++ )
 		block_read( swap, swap_slt->swap_addr + i, addr + i * BLOCK_SECTOR_SIZE );
-	filesys_lock_release ();
+	//filesys_lock_release ();
 
 	bitmap_set_multiple ( free_swap_bitmap, swap_slt->swap_addr, PGSIZE / BLOCK_SECTOR_SIZE, false );
 }

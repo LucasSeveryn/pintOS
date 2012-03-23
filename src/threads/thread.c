@@ -16,6 +16,7 @@
 #ifdef USERPROG
 #include "userprog/process.h"
 #include "userprog/pagedir.h"
+#include "userprog/syscall.h"
 #endif
 
 /* Random value for struct thread's `magic' member.
@@ -329,7 +330,11 @@ thread_exit (void)
       if(dirty){
         int zero_after = ( i == pages - 1) ? fl%PGSIZE : PGSIZE;
         file_seek (fh->file, i*PGSIZE);
+        filesys_lock_acquire ();
+        frame_pin (uaddr, PGSIZE);
         file_write (fh->file, uaddr, zero_after);
+        frame_unpin (uaddr, PGSIZE);
+        filesys_lock_release ();
       }
     }
     file_close (fh->file);

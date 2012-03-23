@@ -13,6 +13,7 @@
 #include "vm/swap.h"
 #include "vm/page.h"
 #include "vm/frame.h"
+#include "vm/read_buffer.h"
 
 static bool DEBUG = false;
 
@@ -193,22 +194,29 @@ page_fault (struct intr_frame *f)
     {
       case EXEC:
       case FILE:
-        filesys_lock_acquire();
+        filesys_lock_acquire ();
+        frame_pin (fault_page, PGSIZE);
         file_seek (page->origin->source_file, page->origin->offset);
         int a;
-        if ((a = file_read (page->origin->source_file, kpage, page->origin->zero_after))
+        if ((a = file_read (page->origin->source_file, read_buffer_get(), page->origin->zero_after))
           != (int) page->origin->zero_after)
         {
-          filesys_lock_release();
+          filesys_lock_release ();
           frame_free (kpage);
           syscall_t_exit (t->name, -1);
         }
-        filesys_lock_release();
+        if(DEBUG)printf("Copying data from buffer: %p to memory:%p\n", read_buffer_get(), kpage);
+        memcpy (kpage, read_buffer_get(), PGSIZE);
+        frame_unpin (fault_page, PGSIZE);
+        filesys_lock_release ();
+
         memset (kpage + page->origin->zero_after, 0, PGSIZE - page->origin->zero_after);
         writable = page->origin->writable;
         break;
       case SWAP:
+        frame_pin (fault_page, PGSIZE);
         swap_load( kpage, page->swap_elem );
+        frame_unpin (fault_page, PGSIZE);
         dirty = true;
         break;
       case ZERO:
